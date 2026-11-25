@@ -121,6 +121,8 @@ test('chi scrive il valore misurato al posto del nominale viene corretto con una
   const e = buildExercise('colori', 0), q = e.question as { expected: number };
   assert.equal(feedbackFor(e.question, q.expected), null, 'una risposta giusta non ha bisogno di spiegazioni');
   assert.equal(feedbackFor(buildExercise('interrotta', 0).question, 0), null, 'le domande a scelta non ne hanno');
+  const vicinissimo = { kind: 'number' as const, unit: 'V', expected: 5, tolerancePct: 2, near: { value: 5.05, tolerancePct: 1, message: 'misurato' } };
+  assert.equal(feedbackFor(vicinissimo, 5.04), null, 'una risposta giusta che è anche vicina al misurato non riceve la spiegazione dello sbaglio');
   for (let v = 0; v < 20; v++) {
     const c = buildExercise('codice-condensatore', v), real = (c.scene.parts[0].truth.real as number) * 1e9;
     if (!checkAnswer(c.question, real)) assert.match(feedbackFor(c.question, real) ?? '', /capacimetro/, `condensatore, variante ${v}`);
