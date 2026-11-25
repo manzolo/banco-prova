@@ -7,6 +7,7 @@ import { NEW_METER, read, type Dial, type Jack, type Reading } from '../shared/m
 import { decodeBands, decodeCapacitorCode } from '../shared/parts.ts';
 import { flipSwitch, loop, padPositions, row, sceneElements, scenePads, type Scene } from '../shared/scene.ts';
 import { battery, diode, resistor, toggle } from '../shared/parts.ts';
+import { captureScope, newScope } from '../shared/scope.ts';
 import { vicino } from './aiuti.ts';
 
 const misura = (s: Scene, dial: Dial, red: string, black: string, jack: Jack = 'v', o: { capV?: Record<string, number>; dt?: number } = {}): Reading => read(sceneElements(s), { ...NEW_METER, dial, jack }, { red, black }, o);
@@ -14,7 +15,16 @@ const piedini = (e: Exercise, i: number): string[] => e.scene.parts[i].pads;
 const conduce = (s: Scene, a: string, b: string): boolean => misura(s, 'diode', a, b).display !== 'OL';
 
 /** Come si risolve ogni esercizio usando solo ciò che si vede (bande, sigle) e ciò che dice il multimetro. */
+// Anche l'oscilloscopio è uno strumento: si usano solo campioni e scale, senza leggere elementi o truth.
+function trace(e: Exercise, node: string, ground: string) {
+  const scope = newScope(); scope.channels[0] = { ...scope.channels[0], probe: node, ground };
+  return captureScope(sceneElements(e.scene), scope).frame;
+}
 const PROCEDIMENTI: Record<string, (e: Exercise) => number> = {
+  'ac-peak': e => trace(e, 'T1.1', 'T1.2').stats[0].max / Math.SQRT2,
+  'ac-frequency': e => 1 / trace(e, 'T1.1', 'T1.2').periods[0]!,
+  'half-wave': e => trace(e, 'R1.1', 'R1.2').stats[0].max,
+  'bridge-ripple': e => { const s = trace(e, 'C1.1', 'C1.2').stats[0]; return s.max - s.min; },
   colori: e => { const ohm = decodeBands(e.scene.parts[0].view.bands as string[]).ohm; return ohm >= 1e6 ? ohm / 1e6 : ohm >= 1e3 ? ohm / 1e3 : ohm; },
   tolleranza: e => { const nominale = decodeBands(e.scene.parts[0].view.bands as string[]).ohm, [a, b] = piedini(e, 0); return Math.abs(misura(e.scene, 'ohm', a, b).value / nominale - 1) <= 0.05 ? 0 : 1; },
   interrotta: e => e.scene.parts.findIndex(p => misura(e.scene, 'ohm', p.pads[0], p.pads[1]).display === 'OL'),
@@ -42,13 +52,13 @@ const PROCEDIMENTI: Record<string, (e: Exercise) => number> = {
   'npn-pnp': e => { const p = piedini(e, 0), base = [0, 1, 2].find(i => [0, 1, 2].filter(j => j !== i).every(j => conduce(e.scene, p[i], p[j]))); return base !== undefined ? 0 : 1; },
 };
 
-test('gli esercizi sono venti, con identificativi unici, in sei capitoli', () => {
-  assert.equal(EXERCISES.length, 20); assert.equal(new Set(EXERCISES.map(e => e.id)).size, 20); assert.equal(CHAPTERS.length, 6);
+test('gli esercizi sono ventiquattro, con identificativi unici, in sette capitoli', () => {
+  assert.equal(EXERCISES.length, 24); assert.equal(new Set(EXERCISES.map(e => e.id)).size, 24); assert.equal(CHAPTERS.length, 7);
   assert.deepEqual(Object.keys(PROCEDIMENTI).sort(), EXERCISES.map(e => e.id).sort(), 'ogni esercizio ha il suo procedimento');
   assert.throws(() => buildExercise('niente', 0));
 });
 
-test('ogni esercizio, in venti varianti, si risolve col multimetro e solo con quello', () => {
+test('ogni esercizio, in venti varianti, si risolve con le misure degli strumenti', () => {
   for (const d of EXERCISES) for (let variante = 0; variante < 20; variante++) {
     const e = d.build(variante), risposta = PROCEDIMENTI[d.id](e);
     assert.equal(checkAnswer(e.question, risposta), true, `${d.id}, variante ${variante}: il procedimento dà ${risposta}, attesa ${JSON.stringify(e.question)}`);

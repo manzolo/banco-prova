@@ -1,11 +1,11 @@
 # 🔧 Banco di prova
 
-Simulatore di componenti elettronici e multimetro, da giocare nel browser: **resistenze, condensatori, bobine, diodi,
+Simulatore di componenti elettronici, multimetro e oscilloscopio, da giocare nel browser: **resistenze, condensatori, bobine, diodi,
 LED, zener, transistor, fusibili e pile** da misurare con un multimetro che si usa come quello vero (selettore,
 boccole, puntali) e che sbaglia come quello vero: il puntale nella boccola sbagliata fa saltare il fusibile, gli ohm
-su un circuito acceso non valgono, una pila scarica a vuoto sembra buona. Venti esercizi con varianti e un banco libero.
+su un circuito acceso non valgono, una pila scarica a vuoto sembra buona. Ventiquattro esercizi con varianti e un banco libero. Il capitolo «Alternata e oscilloscopio» comprende picco, frequenza, semionda e ponte raddrizzatore con filtro e ripple.
 
-Un progetto di Andrea Manzi (IU5VMO). Sotto c'è un piccolo risolutore di circuiti in continua: che cosa calcola e
+Un progetto di Andrea Manzi (IU5VMO). Sotto c'è un piccolo risolutore di circuiti in continua e nel tempo: che cosa calcola e
 quanto fidarsi sta in `docs/MODELLO.md`.
 
 ## Provarlo
@@ -30,7 +30,7 @@ make test-all      # tutto insieme: va lanciato prima di ogni commit
 
 - `shared/` — il modello: `circuit.ts` (analisi nodale, diodi con Newton, condensatori nel tempo), `parts.ts`
   (componenti, codici, guasti), `meter.ts` (il multimetro come elemento del circuito), `scene.ts`, `exercises.ts`,
-  `game.ts`, `save.ts`. I numeri in `shared/config.ts`.
+  `game.ts`, `save.ts`, `transient.ts` (avanzamento nel tempo), `scope.ts` (due canali da 1 MΩ, tracce e trigger). I numeri in `shared/config.ts`.
 - `client/` — il banco disegnato in SVG e l'interfaccia: mostra quello che il modello calcola.
 - `server/` — serve la build e `/api/health` con la versione.
 - `tests/`, `scripts/difetti*.ts` — le prove e i difetti iniettati.

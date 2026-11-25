@@ -31,11 +31,11 @@ try {
   const contesto = await browser.newContext({ viewport: { width: 1360, height: 900 } });
   const page = await contesto.newPage(); ascolta(page);
 
-  await prova('il menu: titolo, venti esercizi in sei capitoli, il banco libero, la versione', async () => {
+  await prova('il menu: titolo, ventiquattro esercizi in sette capitoli, il banco libero, la versione', async () => {
     await page.goto(base);
     assert.match(await page.title(), /Banco di prova/);
     await page.locator('.esercizio').first().waitFor();
-    assert.equal(await page.locator('.esercizio').count(), 21); assert.equal(await page.locator('.capitolo').count(), 7);
+    assert.equal(await page.locator('.esercizio').count(), 25); assert.equal(await page.locator('.capitolo').count(), 8);
     assert.match(await page.locator('.esercizio.prossimo').innerText(), /Il codice colori[\s\S]*comincia da qui/);
     await page.waitForFunction(() => /^v\d+\.\d+\.\d+$/.test(document.querySelector('.versione')?.textContent ?? ''));
     await page.screenshot({ path: `${scatti}/01-menu.png`, fullPage: true });
@@ -151,6 +151,71 @@ try {
     await p.screenshot({ path: `${scatti}/10-telefono-banco.png`, fullPage: true });
     await p.tap(`.scelta[data-scelta="${saltato}"]`); assert.match(await p.locator('#esito').innerText(), /Giusto ★★★/); assert.ok(await largo(), 'dopo la risposta');
     await tel.close();
+  });
+
+
+  await prova('oscilloscopio: due canali, puntali sui piedini, scale, accoppiamento e trigger', async () => {
+    await page.goto(base); await page.click('.esercizio[data-id=ac-peak]');
+    await page.click('#scope-0-probe'); await piedino(page, 'T1.1').click();
+    await page.click('#scope-0-ground'); await piedino(page, 'T1.2').click();
+    await page.selectOption('#scope-1-probe-node', 'T1.2'); await page.selectOption('#scope-1-ground-node', 'T1.1');
+    await passi(page, 24);
+    assert.equal(await page.locator('#scope-screen polyline').count(), 2);
+    assert.equal(await page.locator('#scope-screen .scope-grid line').count(), 20);
+    assert.equal(await page.locator('.puntale[class*="scope-"]').count(), 4);
+    assert.match(await page.locator('#scope-status').innerText(), /agganciato/);
+    const points = await page.locator('[data-trace="0"]').getAttribute('points');
+    assert.ok(points && points.length > 500);
+    await page.selectOption('#scope-0-volt', '10'); await page.selectOption('#scope-time', '5');
+    await passi(page, 12); assert.notEqual(await page.locator('[data-trace="0"]').getAttribute('points'), points);
+    await page.fill('#scope-trigger', '100'); await page.locator('#scope-trigger').blur(); await passi(page, 6);
+    assert.match(await page.locator('#scope-status').innerText(), /Corsa libera/);
+    await page.fill('#scope-trigger', '0'); await page.locator('#scope-trigger').blur();
+    await page.selectOption('#scope-trigger-channel', '1'); await page.selectOption('#scope-0-coupling', 'ac'); await passi(page, 12);
+    assert.match(await page.locator('#scope-status').innerText(), /agganciato/);
+    await page.click('.pos[data-dial=vac]'); await posa(page, 'T1.1', 'T1.2');
+    const measured = (await lettura(page)).value;
+    const peakText = await page.locator('#scope-stats-0').innerText();
+    const peak = Number(peakText.match(/max ([\d,]+) V/)![1].replace(',', '.'));
+    assert.ok(Math.abs(measured - peak / Math.SQRT2) < .01);
+    await page.fill('#risposta', String(peak / Math.SQRT2)); await page.click('#conferma');
+    assert.match(await page.locator('#esito').innerText(), /Giusto/);
+    await page.screenshot({ path: `${scatti}/11-oscilloscopio.png`, fullPage: true });
+  });
+
+  await prova('frequenza: il periodo letto sullo schermo risolve la domanda', async () => {
+    await page.click('#al-menu'); await page.click('.esercizio[data-id=ac-frequency]');
+    await page.selectOption('#scope-0-probe-node', 'T1.1'); await page.selectOption('#scope-0-ground-node', 'T1.2');
+    await passi(page, 18);
+    const t = await page.locator('#scope-stats-0').innerText();
+    const ms = Number(t.match(/periodo ([\d,]+) ms/)![1].replace(',', '.'));
+    await page.fill('#risposta', String(1000 / ms)); await page.click('#conferma');
+    assert.match(await page.locator('#esito').innerText(), /Giusto/);
+  });
+
+  await prova('ponte con filtro: ripple misurabile, meno con capacità doppia e più con carico maggiore', async () => {
+    await page.click('#al-menu'); await page.click('.esercizio[data-id=bridge-ripple]');
+    await page.selectOption('#scope-0-probe-node', 'C1.1'); await page.selectOption('#scope-0-ground-node', 'C1.2');
+    await page.selectOption('#scope-0-coupling', 'ac'); await page.selectOption('#scope-0-volt', '0.2');
+    const ripple = async () => { await passi(page, 30); const t = await page.locator('#scope-stats-0').innerText(); return Number(t.match(/picco-picco ([\d,]+) V/)![1].replace(',', '.')); };
+    const initial = await ripple(); assert.ok(initial > .05 && initial < 5);
+    await page.click('#filter-capacity'); const moreC = await ripple(); assert.ok(moreC < initial * .65);
+    await page.click('#filter-load'); const moreLoad = await ripple(); assert.ok(moreLoad > initial * 1.5);
+    await page.click('#filter-reset'); const restored = await ripple(); assert.ok(Math.abs(restored / initial - 1) < .03);
+    await page.fill('#risposta', String(restored)); await page.click('#conferma'); assert.match(await page.locator('#esito').innerText(), /Giusto/);
+    await page.screenshot({ path: `${scatti}/12-ponte-filtro.png`, fullPage: true });
+  });
+
+  await prova('oscilloscopio a 390 px: sonde col tocco, tutti i comandi accessibili e nessuno scorrimento laterale', async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const p = await context.newPage(); ascolta(p); await p.goto(base);
+    await p.tap('.esercizio[data-id=bridge-ripple]'); await p.tap('#scope-0-probe'); await piedino(p, 'C1.1').tap();
+    await p.tap('#scope-0-ground'); await piedino(p, 'C1.2').tap();
+    await p.selectOption('#scope-0-coupling', 'ac'); await p.selectOption('#scope-0-volt', '0.2'); await passi(p, 24);
+    assert.equal(await p.locator('#scope-screen polyline').count(), 1);
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= 391));
+    assert.ok(await p.evaluate(() => [...document.querySelectorAll('#oscilloscopio button, #oscilloscopio select, #oscilloscopio input, #scope-screen')].every(e => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= 391; })));
+    await p.screenshot({ path: `${scatti}/13-telefono-oscilloscopio.png`, fullPage: true }); await context.close();
   });
 
   await prova('il server dice chi è e che versione serve', async () => {

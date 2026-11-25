@@ -1,9 +1,9 @@
 // I componenti del banco: ognuno sa che cosa porta stampato addosso (bande, sigla, codice), quali piedini ha e come si
 // comporta elettricamente, guasti compresi. Il banco li mette in scena; il risolutore vede solo gli elementi.
-import { BAND_COLORS, BJT, DIODES, TOLERANCE_COLORS, WIRE_OHM, type DiodeModel } from './config.ts';
+import { BAND_COLORS, TRANSIENT, BJT, DIODES, TOLERANCE_COLORS, WIRE_OHM, type DiodeModel } from './config.ts';
 import type { Element } from './circuit.ts';
 
-export type PartType = 'resistor' | 'capacitor' | 'inductor' | 'diode' | 'zener' | 'led' | 'bjt' | 'fuse' | 'battery' | 'pot' | 'switch' | 'transformer';
+export type PartType = 'resistor' | 'capacitor' | 'inductor' | 'diode' | 'zener' | 'led' | 'bjt' | 'fuse' | 'battery' | 'pot' | 'switch' | 'transformer' | 'bridge';
 export interface Part {
   id: string; type: PartType;
   mark: string;                 // quello che c'è scritto o disegnato sul componente
@@ -131,10 +131,21 @@ export function toggle(id: string, closed: boolean): Part {
 }
 
 /** Il secondario di un trasformatore da rete: una tensione alternata (valore efficace) con la resistenza del suo filo. */
-export function transformer(id: string, voltRms: number): Part {
+export function transformer(id: string, voltRms: number, hz: number = TRANSIENT.defaultHz, wave: 'sine' | 'square' = 'sine'): Part {
   const p = pads(id, 2);
-  return { id, type: 'transformer', mark: `secondario ${voltRms} V~`, pads: p, elements: [{ id: `${id}.v`, kind: 'V', a: p[0], b: p[1], volt: voltRms, rs: 0.8, ac: true }], view: {}, truth: { voltRms } };
+  return { id, type: 'transformer', mark: `secondario ${voltRms} V~`, pads: p, elements: [{ id: `${id}.v`, kind: 'V', a: p[0], b: p[1], volt: voltRms, rs: 0.8, ac: true, hz, wave }], view: {}, truth: { voltRms } };
 }
 
 /** Un filo fra due nodi. */
 export const wire = (id: string, a: string, b: string): Element => ({ id, kind: 'R', a, b, ohm: WIRE_OHM });
+
+/** Ponte: due diodi conducono per semiperiodo. Piedini: alternata A, positivo, alternata B, negativo. */
+export function bridge(id: string): Part {
+  const p = pads(id, 4);
+  const pairs = [[p[0], p[1]], [p[2], p[1]], [p[3], p[0]], [p[3], p[2]]];
+  const elements = pairs.flatMap(([a, b], i) => {
+    const d = diode(`${id}.D${i + 1}`, '1N4007');
+    return d.elements.map(e => ({ ...e, a: e.a === d.pads[0] ? a : e.a, b: e.b === d.pads[1] ? b : e.b }));
+  });
+  return { id, type: 'bridge', mark: 'ponte a quattro diodi', pads: p, elements, view: {}, truth: {} };
+}

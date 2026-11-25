@@ -34,7 +34,7 @@ h1 { font: 700 40px/1 Georgia, serif; color: var(--amber); }
 /* banco */
 .barra { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; }
 .titolo { display: flex; flex-direction: column; } .titolo b { color: var(--amber); font-size: 17px; } .titolo span { color: var(--mute); font-size: 13px; }
-.griglia { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); grid-template-areas: "piano multimetro" "domanda multimetro"; gap: 12px; align-items: start; }
+.griglia { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); grid-template-areas: "piano multimetro" "oscilloscopio multimetro" "domanda domanda"; gap: 12px; align-items: start; }
 .piano { grid-area: piano; } .multimetro { grid-area: multimetro; } .domanda { grid-area: domanda; }
 .pannello { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
 .pannello h3 { font-size: 17px; color: var(--amber); margin-bottom: 6px; }
@@ -95,10 +95,31 @@ h1 { font: 700 40px/1 Georgia, serif; color: var(--amber); }
 @media (max-width: 900px) {
   main { padding: 10px 10px 32px; }
   h1 { font-size: 30px; } .logo { width: 50px; height: 50px; }
-  .griglia { grid-template-columns: 1fr; grid-template-areas: "piano" "multimetro" "domanda"; }
+  .griglia { grid-template-columns: 1fr; grid-template-areas: "piano" "oscilloscopio" "multimetro" "domanda"; }
   .lcd-numero { font-size: 38px; } .pos, .boccola, .scegli, .scelta, .piccolo, .pezzo { min-height: 44px; }
-  .multimetro { position: sticky; bottom: 0; z-index: 5; }
+  .multimetro { position: static; }
   .selettore { grid-template-columns: repeat(5, 1fr); } .pos small { display: none; } .pos { min-height: 44px; padding: 6px 2px; } .pos b { font-size: 16px; }
   .nota-strumento { min-height: 0; margin: 6px 0; font-size: 12.5px; } .boccole, .puntali { margin-top: 8px; } .et.com { display: none; }
   .lcd { min-height: 0; padding: 6px 12px; } .lcd-numero { min-height: 40px; }
 }
+
+/* Oscilloscopio: il reticolo conserva le proporzioni anche a 390 px. */
+.oscilloscopio { grid-area: oscilloscopio; }
+#scope-screen { margin: 12px 0 6px; background: #071b20; border: 1px solid #386069; }
+#scope-screen svg { display: block; width: 100%; max-height: 400px; }
+.scope-grid { stroke: #28515b; stroke-width: 1; }
+#scope-screen polyline { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.trace-0 { stroke: #ffd95a; } .trace-1 { stroke: #69cfff; }
+.scope-controls, .scope-channels { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.oscilloscopio label { display: flex; flex-direction: column; font-size: 12px; gap: 3px; min-width: 0; }
+.oscilloscopio select, .oscilloscopio input { background: #17142a; color: var(--ink); border: 1px solid var(--line); padding: 8px; max-width: 100%; min-width: 0; border-radius: 5px; }
+.oscilloscopio input { width: 100px; }
+.scope-channel { flex: 1 1 210px; min-width: 0; border: 1px solid var(--line); border-radius: 5px; display: grid; gap: 8px; }
+.channel-0 legend { color: #ffd95a; } .channel-1 legend { color: #69cfff; }
+.scope-lead { display: flex; flex-wrap: wrap; align-items: end; gap: 6px; }
+.scope-lead button { min-height: 44px; }
+.scope-lead .scelto { border-color: var(--gold); }
+.scope-measures, #scope-status { font-size: 12px; overflow-wrap: anywhere; }
+.scope-measures p { margin-top: 5px; }
+.scope-filter { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.scope-filter p { flex-basis: 100%; }

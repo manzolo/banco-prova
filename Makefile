@@ -74,7 +74,7 @@ DEPLOY_IMAGE ?= git.manzolo.it/manzolo/banco-prova
 DEPLOY_TMP   := $(shell mktemp -d -u /tmp/bancoprova-deploy.XXXXXX)
 SMOKE_PORT   ?= 18803
 # La versione dell'ultimo commit (la scrive scripts/bump.sh): il tag deve esistere e il server la espone in /api/health.
-DEPLOY_VER   := v$(shell git show HEAD:package.json 2>/dev/null | sed -n 's/^  "version": "\([^"]*\)",/\1/p')
+DEPLOY_VER   = v$(shell git show HEAD:package.json 2>/dev/null | sed -n 's/^  "version": "\([^"]*\)",/\1/p')
 
 .PHONY: verify check-public hooks bump deploy deploy-logs
 verify: check-public test-all ## Tutti i controlli: file pubblicabili, build, motore, difetti e browser (lo lancia make bump)

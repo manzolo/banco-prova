@@ -47,3 +47,13 @@ export const BJT = { be: { is: 2e-14, n: 1.0, rs: 2 }, bc: { is: 6e-14, n: 1.0, 
 export const E12 = [10, 12, 15, 18, 22, 27, 33, 39, 47, 56, 68, 82] as const;
 export const BAND_COLORS = ['nero', 'marrone', 'rosso', 'arancio', 'giallo', 'verde', 'blu', 'viola', 'grigio', 'bianco'] as const;
 export const TOLERANCE_COLORS: Record<number, string> = { 1: 'marrone', 2: 'rosso', 5: 'oro', 10: 'argento' };
+
+/** Campionamento didattico: almeno 128 passi per periodo, al massimo 0,1 ms; soli segnali a bassa tensione. */
+export const TRANSIENT = { defaultHz: 50, maxStep: 0.0001, samplesPerPeriod: 128, settleSeconds: 0.2, measurementSeconds: 0.02 } as const;
+/** Oscilloscopio ideale a due ingressi differenziali isolati: niente collegamento fra le masse dei canali. */
+export const SCOPE = { inputOhm: 1e6, columns: 10, rows: 8,
+  volts: [0.1, 0.2, 0.5, 1, 2, 5, 10], milliseconds: [0.1, 0.2, 0.5, 1, 2, 5, 10],
+  defaultVoltDiv: 5, defaultTimeDiv: 0.002 } as const;
+
+/** Residuo massimo della linearizzazione dei diodi nei transitori: 0,1 nA per giunzione. */
+export const TRANSIENT_CURRENT_TOLERANCE = 1e-10;

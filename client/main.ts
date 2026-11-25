@@ -6,12 +6,13 @@ import type { Dial, Jack, Note, Reading } from '../shared/meter.ts';
 import { SAVE_KEY, parseSave, recordSolved, serializeSave, starCount, type Save } from '../shared/save.ts';
 import { beep, buzz, chime, click, pop, setSound } from './audio.ts';
 import { COME_HTML } from './come.ts';
+import { scopePanel, type ScopeLead } from './scope.ts';
 import { sceneSvg } from './draw.ts';
 import { h, stelle } from './ui.ts';
 
 type View = 'menu' | 'banco' | 'come';
 const app = document.querySelector<HTMLDivElement>('#app')!;
-const S = { tick: 0, view: 'menu' as View, save: leggi(), bench: null as Bench | null, reading: null as Reading | null, drawer: DRAWER[0].id, probe: 'red' as 'red' | 'black', version: '',
+const S = { scopeLead: null as ScopeLead | null, tick: 0, view: 'menu' as View, save: leggi(), bench: null as Bench | null, reading: null as Reading | null, drawer: DRAWER[0].id, probe: 'red' as 'red' | 'black', version: '',
   esito: null as { correct: boolean; stars: number; feedback: string | null } | null };
 setSound(S.save.sound);
 
@@ -59,7 +60,7 @@ function mostraMenu(): void {
 
 function comincia(id: string | null, variante?: number): void {
   const v = variante ?? (id ? (S.save.done[id] ?? 0) : 0);
-  S.bench = newBench(id, v, S.drawer); S.reading = null; S.esito = null; S.probe = 'red';
+  S.bench = newBench(id, v, S.drawer); S.reading = null; S.esito = null; S.probe = 'red'; S.scopeLead = null;
   click(); vai('banco');
 }
 
@@ -92,6 +93,10 @@ function mostraBanco(): void {
     if (!pad) return;
     const node = pad.getAttribute('data-node')!, b = S.bench!;
     click();
+    if (S.scopeLead) {
+      const { channel, lead } = S.scopeLead;
+      fai({ type: 'scopeProbe', channel, lead, node: b.scope.channels[channel][lead] === node ? null : node }); return;
+    }
     if (b.probes[S.probe] === node) { fai({ type: 'probe', color: S.probe, node: null }); return; }      // ritoccare lo stesso piedino toglie il puntale
     const posato = S.probe; S.probe = posato === 'red' ? 'black' : 'red';
     fai({ type: 'probe', color: posato, node });
@@ -102,11 +107,13 @@ function mostraBanco(): void {
   const boccole = h('div', { class: 'boccole' }, h('span', { class: 'et' }, 'Puntale rosso nella boccola'), ...JACKS.map(([j, nome]) => h('button', { class: 'boccola', 'data-jack': j, onclick: () => { click(); fai({ type: 'jack', jack: j }); } }, nome)),
     h('span', { class: 'et com' }, 'il nero sta sempre in COM'));
   const puntali = h('div', { class: 'puntali' }, h('span', { class: 'et' }, 'Puntale da posare'),
-    h('button', { class: 'scegli rosso', id: 'scegli-rosso', onclick: () => { S.probe = 'red'; click(); vista?.ridisegna(); } }, 'rosso'),
-    h('button', { class: 'scegli nero', id: 'scegli-nero', onclick: () => { S.probe = 'black'; click(); vista?.ridisegna(); } }, 'nero'),
-    h('button', { class: 'piccolo', id: 'togli-puntali', onclick: () => { click(); S.probe = 'red'; S.bench = apply(apply(S.bench!, { type: 'probe', color: 'red', node: null }), { type: 'probe', color: 'black', node: null }); passo(); vista?.ridisegna(); } }, 'togli i puntali'));
+    h('button', { class: 'scegli rosso', id: 'scegli-rosso', onclick: () => { S.scopeLead = null; S.probe = 'red'; click(); vista?.ridisegna(); } }, 'rosso'),
+    h('button', { class: 'scegli nero', id: 'scegli-nero', onclick: () => { S.scopeLead = null; S.probe = 'black'; click(); vista?.ridisegna(); } }, 'nero'),
+    h('button', { class: 'piccolo', id: 'togli-puntali', onclick: () => { click(); S.scopeLead = null; S.probe = 'red'; S.bench = apply(apply(S.bench!, { type: 'probe', color: 'red', node: null }), { type: 'probe', color: 'black', node: null }); passo(); vista?.ridisegna(); } }, 'togli i puntali'));
   const fusibili = h('div', { class: 'fusibili', id: 'fusibili' });
   const cassetto = ex ? null : h('div', { class: 'cassetto', id: 'cassetto' }, h('span', { class: 'et' }, 'Dal cassetto'), ...DRAWER.map(d => h('button', { class: 'pezzo', 'data-pezzo': d.id, onclick: () => { S.drawer = d.id; comincia(null); } }, d.name)));
+
+  const scope = scopePanel(() => S.bench!, fai, lead => { S.scopeLead = lead; vista?.ridisegna(); });
 
   // --- pannello della domanda
   const domanda = h('section', { class: 'pannello domanda', id: 'domanda' });
@@ -145,15 +152,15 @@ function mostraBanco(): void {
       h('section', { class: 'pannello piano' }, scena, cassetto, h('p', { class: 'guida' }, 'Tocca un piedino (i cerchietti) per posarci il puntale scelto; ritoccalo per toglierlo. I ponticelli si aprono e si chiudono con un clic.')),
       h('section', { class: 'pannello multimetro', id: 'multimetro' },
         h('div', { class: 'lcd' }, spia, display, unita), nota, selettore, boccole, puntali, fusibili),
-      domanda)));
+      scope.panel, domanda)));
 
   vista = {
     ridisegna(): void {
       const b = S.bench!;
-      scena.innerHTML = sceneSvg(b.scene, b.probes, b.exercise === null);
+      scena.innerHTML = sceneSvg(b.scene, b.probes, b.exercise === null, b.scope);
       for (const el of selettore.querySelectorAll<HTMLElement>('.pos')) el.classList.toggle('scelto', el.dataset.dial === b.meter.dial);
       for (const el of boccole.querySelectorAll<HTMLElement>('.boccola')) el.classList.toggle('scelto', el.dataset.jack === b.meter.jack);
-      puntali.querySelector('#scegli-rosso')!.classList.toggle('scelto', S.probe === 'red'); puntali.querySelector('#scegli-nero')!.classList.toggle('scelto', S.probe === 'black');
+      puntali.querySelector('#scegli-rosso')!.classList.toggle('scelto', !S.scopeLead && S.probe === 'red'); puntali.querySelector('#scegli-nero')!.classList.toggle('scelto', !S.scopeLead && S.probe === 'black');
       const guasti: Node[] = [];
       if (b.meter.fuseMaBlown) guasti.push(h('button', { class: 'cambia', id: 'cambia-ma', onclick: () => { click(); fai({ type: 'replaceFuse', jack: 'ma' }); } }, 'Fusibile mA saltato: cambialo'));
       if (b.meter.fuseABlown) guasti.push(h('button', { class: 'cambia', id: 'cambia-a', onclick: () => { click(); fai({ type: 'replaceFuse', jack: 'a' }); } }, 'Fusibile 10 A saltato: cambialo'));
@@ -163,6 +170,7 @@ function mostraBanco(): void {
     },
     lettura(): void {
       const b = S.bench!, r = S.reading; if (!r) return;
+      scope.update(S.scopeLead);
       display.textContent = b.meter.dial === 'off' ? '' : r.display; unita.textContent = b.meter.dial === 'off' ? '' : r.unit;
       display.dataset.spento = String(b.meter.dial === 'off'); spia.textContent = r.beep ? '·)))' : '';
       const testo = b.meter.dial === 'off' ? 'Multimetro spento: gira il selettore.' : NOTE[r.note](b);

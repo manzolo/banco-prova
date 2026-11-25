@@ -66,7 +66,7 @@ test('il salvataggio: vuoto, andata e ritorno, il migliore resta e le varianti s
   const a = recordSolved(s, 'colori', 2), b = recordSolved(a, 'colori', 3), c = recordSolved(b, 'colori', 1);
   assert.equal(b.stars.colori, 3); assert.equal(c.stars.colori, 3, 'un risultato peggiore non cancella il migliore'); assert.equal(c.done.colori, 3); assert.deepEqual(s.stars, {}, 'il salvataggio di prima non cambia');
   assert.equal(recordSolved(s, 'marte', 3), s); assert.equal(recordSolved(s, 'colori', 0), s); assert.equal(recordSolved(s, 'colori', 9).stars.colori, 3);
-  assert.deepEqual(parseSave(serializeSave(c)), c); assert.deepEqual(starCount(recordSolved(c, 'catodo', 2)), { got: 5, of: 60 });
+  assert.deepEqual(parseSave(serializeSave(c)), c); assert.deepEqual(starCount(recordSolved(c, 'catodo', 2)), { got: 5, of: 72 });
 });
 
 test('il salvataggio della versione 1 si legge ancora, e uno rotto non rompe il gioco', () => {

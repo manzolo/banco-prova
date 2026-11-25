@@ -3,13 +3,13 @@
 // volte, ogni volta sostituendo il diodo con la retta tangente alla sua curva (Newton), finché le tensioni non si fermano.
 // I condensatori in continua sono aperti; con un passo di tempo diventano una conduttanza C/dt più un generatore che
 // ricorda la tensione di prima (Eulero all'indietro): basta per vedere una carica attraverso una resistenza.
-import { GMIN, VT, ZENER } from './config.ts';
+import { GMIN, VT, ZENER, TRANSIENT, TRANSIENT_CURRENT_TOLERANCE } from './config.ts';
 
 export type Element =
   | { id: string; kind: 'R'; a: string; b: string; ohm: number }
   /** Generatore di tensione reale: «volt» fra a (+) e b (−) a vuoto, con resistenza interna «rs» (maggiore di zero).
    *  Con «ac» è un generatore in alternata e «volt» è il valore efficace: in continua vale zero. */
-  | { id: string; kind: 'V'; a: string; b: string; volt: number; rs: number; ac?: boolean }
+  | { id: string; kind: 'V'; a: string; b: string; volt: number; rs: number; ac?: boolean; hz?: number; wave?: 'sine' | 'square' }
   /** Diodo: a è l'anodo, b il catodo. is e n sono quelli di Shockley; zener, se c'è, è la tensione di rottura inversa. */
   | { id: string; kind: 'D'; a: string; b: string; is: number; n: number; zener?: number }
   | { id: string; kind: 'C'; a: string; b: string; farad: number };
@@ -23,7 +23,14 @@ export interface Solution {
 }
 export interface SolveOptions { dt?: number; capV?: Record<string, number>; ground?: string;
   /** true: si guardano solo i generatori in alternata (valori efficaci, circuito trattato come lineare); false o assente: solo quelli in continua. */
-  ac?: boolean }
+  ac?: boolean; time?: number; initialV?: Record<string, number> }
+
+/** «volt» resta efficace: la sinusoide ha picco √2·Veff, la quadra simmetrica ha picco Veff. */
+export function sourceVoltage(e: Extract<Element, { kind: 'V' }>, time: number): number {
+  if (!e.ac) return e.volt;
+  const phase = 2 * Math.PI * (e.hz ?? TRANSIENT.defaultHz) * time;
+  return e.wave === 'square' ? e.volt * (Math.sin(phase) >= 0 ? 1 : -1) : Math.SQRT2 * e.volt * Math.sin(phase);
+}
 
 /** Corrente di un diodo e sua derivata a una tensione: Shockley, più il ginocchio di rottura se è uno zener. */
 export function diodeAt(d: { is: number; n: number; zener?: number }, v: number): { i: number; g: number } {
@@ -58,9 +65,9 @@ export function solve(elements: Element[], opts: SolveOptions = {}): Solution {
   const ground = opts.ground && nodes.includes(opts.ground) ? opts.ground : nodes.includes('gnd') ? 'gnd' : nodes[0];
   const idx = new Map<string, number>(); nodes.filter(n => n !== ground).forEach((n, i) => idx.set(n, i));
   const n = idx.size, capPrev = opts.capV ?? {}, dt = opts.dt;
-  const attivo = (e: { volt: number; ac?: boolean }): number => Boolean(e.ac) === Boolean(opts.ac) ? e.volt : 0;
+  const attivo = (e: Extract<Element, { kind: 'V' }>): number => opts.time !== undefined ? sourceVoltage(e, opts.time) : Boolean(e.ac) === Boolean(opts.ac) ? e.volt : 0;
   let v = new Array<number>(n).fill(0);
-  const vd = new Map<string, number>();        // tensione usata per linearizzare ogni diodo
+  const vd = new Map<string, number>(elements.filter(e => e.kind === 'D').map(e => [e.id, (opts.initialV?.[e.a] ?? 0) - (opts.initialV?.[e.b] ?? 0)]));        // tensione usata per linearizzare ogni diodo
   const at = (x: number[], node: string): number => { const i = idx.get(node); return i === undefined ? 0 : x[i]; };
   let converged = elements.every(e => e.kind !== 'D');
   for (let giro = 0; giro < 300; giro++) {
@@ -80,16 +87,20 @@ export function solve(elements: Element[], opts: SolveOptions = {}): Solution {
     }
     const nuovo = n ? gauss(g, rhs) : [];
     if (!nuovo) break;
-    let scarto = 0;
+    let scarto = 0, residual = 0;
     for (const e of elements) if (e.kind === 'D') {
       const prima = vd.get(e.id) ?? 0, voluto = at(nuovo, e.a) - at(nuovo, e.b);
+      // Nei raddrizzatori interdetti il modo comune è quasi flottante: conta anche il residuo di corrente,
+      // perché la sola differenza di tensione amplifica il rumore numerico delle conduttanze minime.
+      const tangent = diodeAt(e, prima);
+      residual = Math.max(residual, Math.abs(diodeAt(e, voluto).i - (tangent.i + tangent.g * (voluto - prima))));
       // freno: in conduzione diretta la curva è ripidissima, quindi si sale a piccoli passi; lo stesso verso il ginocchio dello zener
       const su = prima > 0.2 * e.n ? 0.05 * e.n : 0.4 * e.n, giu = e.zener !== undefined && prima < -e.zener + 0.5 ? 0.1 : 5;
       const ora = Math.min(prima + su, Math.max(prima - giu, voluto));
       scarto = Math.max(scarto, Math.abs(ora - prima), Math.abs(voluto - ora)); vd.set(e.id, ora);
     }
     v = nuovo;
-    if (scarto < 1e-9) { converged = true; break; }
+    if (scarto < 1e-9 || (opts.time !== undefined && residual < TRANSIENT_CURRENT_TOLERANCE)) { converged = true; break; }
   }
   const volt: Record<string, number> = { [ground]: 0 };
   for (const [node, i] of idx) volt[node] = v[i];

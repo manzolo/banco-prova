@@ -4,7 +4,9 @@
 import { E12 } from './config.ts';
 import { read, type Dial, type Jack, type MeterState } from './meter.ts';
 import { battery, bjt, capacitor, diode, fuse, inductor, resistor, si, toggle, transformer, type Part } from './parts.ts';
-import { loop, row, sceneElements, type Scene } from './scene.ts';
+import { rectifier, loop, row, sceneElements, type Scene } from './scene.ts';
+
+import { captureScope, newScope } from './scope.ts';
 
 export type Question =
   | { kind: 'number'; unit: string; expected: number; tolerancePct: number;      // expected nell'unità indicata
@@ -187,6 +189,40 @@ export const EXERCISES: ExerciseDef[] = [
     return { text: 'Stesso tipo di prova: questo transistor è NPN o PNP?', hint: 'Trova la base con la prova diodi. Se conduce col puntale rosso sulla base è NPN (la base è la zona P); se conduce col nero sulla base è PNP.',
       explain: 'NPN: la base è l\'anodo delle due giunzioni. PNP: è il catodo. È la prima cosa da sapere prima di sostituirne uno.',
       scene: row([q]), question: { kind: 'choice', options: ['NPN', 'PNP'], correct: pol === 'npn' ? 0 : 1 } };
+  }),
+  // ------------------------------------------------------------ alternata nel tempo
+  def('ac-peak', 'Alternata e oscilloscopio', 'Dal picco al valore efficace', r => {
+    const volt = pick(r, [3, 6, 9, 12]);
+    return { text: 'Misura il picco della sinusoide di T1 con il canale 1. Dividilo per √2: quale valore efficace ottieni in volt? Controlla anche con V~.',
+      hint: 'Sonda 1 su T1.1, massa 1 su T1.2; 5 V/div e 2 ms/div, accoppiamento DC. Conta le divisioni dal centro al picco e moltiplica per V/div, poi dividi per √2.',
+      explain: 'Per una sinusoide Veff = Vpicco / √2: il picco supera il valore efficace del 41%. V~ misura la radice della media dei quadrati della componente alternata.',
+      scene: row([transformer('T1', volt)]), question: { kind: 'number', unit: 'V', expected: volt, tolerancePct: 3 } };
+  }),
+  def('ac-frequency', 'Alternata e oscilloscopio', 'Un periodo sul reticolo', r => {
+    const hz = pick(r, [50, 100, 1000]);
+    return { text: 'La frequenza del generatore è sconosciuta. Misura un periodo sul reticolo e ricava la frequenza in hertz.',
+      hint: 'Sonda 1 su T1.1 e massa 1 su T1.2. Parti da 2 ms/div; per periodi corti scegli 0,1 ms/div. T = divisioni × tempo/div; f = 1/T con T in secondi.',
+      explain: 'Un periodo da 20 ms significa 50 Hz, da 10 ms significa 100 Hz, da 1 ms significa 1000 Hz. Il trigger sul fronte di salita stabilizza la traccia.',
+      scene: row([transformer('T1', 6, hz)]), question: { kind: 'number', unit: 'Hz', expected: hz, tolerancePct: 3 } };
+  }),
+  def('half-wave', 'Alternata e oscilloscopio', 'Una sola semionda', r => {
+    const scene = rectifier(false, pick(r, [6, 9, 12]), 0, pick(r, [470, 1000]));
+    const scope = newScope(); scope.channels[0].probe = 'R1.1'; scope.channels[0].ground = 'R1.2';
+    const peak = captureScope(sceneElements(scene), scope).frame.stats[0].max;
+    return { text: 'D1 lascia passare una sola semionda. Misura il massimo positivo ai capi del carico R1: quanti volt raggiunge?',
+      hint: 'Sonda 1 su R1.1 e massa 1 su R1.2, DC, 5 V/div e 2 ms/div. Il tratto negativo deve restare vicino a zero. Con il canale 2 su T1 puoi confrontare ingresso e uscita.',
+      explain: 'Il diodo elimina la semionda negativa; sulla positiva perde una tensione che dipende dalla corrente. Il massimo va misurato: non basta assumere sempre una caduta di 0,7 V.',
+      scene, question: { kind: 'number', unit: 'V', expected: peak, tolerancePct: 4 } };
+  }),
+  def('bridge-ripple', 'Alternata e oscilloscopio', 'Il ponte e il filtro', r => {
+    const farad = pick(r, [100e-6, 220e-6, 470e-6]), ohm = pick(r, [470, 1000]), volt = pick(r, [6, 9, 12]);
+    const scene = rectifier(true, volt, farad, ohm);
+    const scope = newScope(); scope.channels[0].probe = 'C1.1'; scope.channels[0].ground = 'C1.2';
+    const ripple = captureScope(sceneElements(scene), scope).frame.stats[0].ripple;
+    return { text: `Secondario da ${volt} V efficaci, ponte a quattro diodi, filtro da ${si(farad, 'F')} e carico da ${si(ohm, 'Ω')}. Dopo l'assestamento misura il ripple picco-picco su C1, in volt. Per la risposta usa questi valori iniziali; poi esplora i comandi del filtro.`,
+      hint: 'Sonda 1 su C1.1, massa 1 su C1.2. Aspetta la carica, scegli AC, 0,2 o 0,5 V/div e 2 ms/div. Ripple = massimo − minimo. Raddoppia C oppure dimezza R: osserva come cambia, poi ripristina i valori iniziali per rispondere.',
+      explain: 'Il ponte ricarica il filtro due volte per periodo: qui ogni 10 ms. Fra le creste C alimenta il carico. A piccolo ripple ΔV ≈ I/(2 f C): più capacità lo riduce, più corrente di carico lo aumenta. Due diodi conducono a ogni ricarica.',
+      scene, question: { kind: 'number', unit: 'V', expected: ripple, tolerancePct: 8 } };
   }),
 ];
 

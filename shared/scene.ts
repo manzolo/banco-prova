@@ -2,7 +2,7 @@
 // pezzi sciolti, oppure un circuito ad anello (un generatore a sinistra, i pezzi in serie in alto, il ritorno in basso,
 // ed eventuali pezzi messi fra il filo alto e il ritorno). La geometria sta qui perché è un dato, non un disegno.
 import type { Element } from './circuit.ts';
-import { toggle, wire, type Part } from './parts.ts';
+import { capacitor, resistor, bridge, diode, transformer, toggle, wire, type Part } from './parts.ts';
 
 export interface Placed { x: number; y: number; vertical: boolean }
 export interface Scene {
@@ -14,6 +14,7 @@ export interface Scene {
 
 /** Dove cadono i piedini di un componente: a 50 unità dal centro, in orizzontale o in verticale (tre piedini: anche al centro). */
 export function padPositions(part: Part, p: Placed): { node: string; x: number; y: number }[] {
+  if (part.pads.length === 4) return part.pads.map((node, i) => ({ node, x: p.x + (i % 2 ? 50 : -50), y: p.y + (i < 2 ? -40 : 40) }));
   const passi = part.pads.length === 3 ? [-50, 0, 50] : [-50, 50];
   return part.pads.map((node, i) => p.vertical ? { node, x: p.x, y: p.y + passi[i] } : { node, x: p.x + passi[i], y: p.y });
 }
@@ -72,4 +73,25 @@ export function loop(source: Part | null, top: Part[], o: { shunts?: { after: nu
 /** Apre o chiude un ponticello (un componente «switch») della scena: restituisce una scena nuova. */
 export function flipSwitch(s: Scene, partId: string): Scene {
   return { ...s, parts: s.parts.map(p => p.id === partId && p.type === 'switch' ? toggle(p.id, !p.truth.closed) : p) };
+}
+
+/** Raddrizzatore didattico: secondario isolato, carico e capacità in parallelo sull'uscita. */
+export function rectifier(full: boolean, volt: number, farad: number, ohm: number): Scene {
+  if (!full) return loop(transformer('T1', volt), [diode('D1', '1N4007')], { shunts: [
+    { after: 0, part: resistor('R1', ohm) }, ...(farad ? [{ after: 0, part: capacitor('C1', farad, 'electrolytic') }] : [])] });
+  const parts = [transformer('T1', volt), bridge('P1'), resistor('R1', ohm), capacitor('C1', farad, 'electrolytic')];
+  const place: Scene['place'] = { T1: { x: 60, y: 150, vertical: true }, P1: { x: 230, y: 150, vertical: false }, R1: { x: 370, y: 150, vertical: true }, C1: { x: 490, y: 150, vertical: true } };
+  const connections = [['T1.1', 'P1.1'], ['T1.2', 'P1.3'], ['P1.2', 'R1.1'], ['P1.4', 'R1.2'], ['R1.1', 'C1.1'], ['R1.2', 'C1.2']];
+  const positions = parts.flatMap(p => padPositions(p, place[p.id]));
+  const lines: Scene['lines'] = connections.flatMap(([a, b]) => {
+    const from = positions.find(p => p.node === a)!, to = positions.find(p => p.node === b)!;
+    return [[from.x, from.y, to.x, from.y], [to.x, from.y, to.x, to.y]] as Scene['lines'];
+  });
+  return { parts, place, lines, wires: connections.map(([a, b], i) => wire(`w.${i}`, a, b)), width: 570, height: 300 };
+}
+
+/** Cambiare carico o capacità conserva i piedini: il condensatore mantiene la tensione nello stato del banco. */
+export function updateFilter(s: Scene, capacity: number, load: number): Scene {
+  if (!(capacity > 0 && load > 0) || !Number.isFinite(capacity + load)) return s;
+  return { ...s, parts: s.parts.map(p => p.id === 'C1' ? capacitor(p.id, capacity, 'electrolytic') : p.id === 'R1' ? resistor(p.id, load) : p) };
 }

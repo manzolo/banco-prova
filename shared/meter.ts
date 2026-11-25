@@ -2,8 +2,10 @@
 // shunt da amperometro, un generatore debole da ohmetro) e mostra quello che ne risulta. Così gli errori veri hanno le
 // conseguenze vere: il puntale nella boccola sbagliata fa un cortocircuito, la misura in ohm su un circuito acceso non
 // vale, un voltmetro su un punto ad alta resistenza legge meno.
-import { METER } from './config.ts';
+import { METER, TRANSIENT } from './config.ts';
 import { solve, type Element, type Solution } from './circuit.ts';
+
+import { measurementWindow, simulate, waveformStats } from './transient.ts';
 
 export type Dial = 'off' | 'vdc' | 'vac' | 'ohm' | 'cont' | 'diode' | 'cap' | 'ma' | 'a';
 export type Jack = 'v' | 'ma' | 'a';
@@ -54,9 +56,9 @@ export function meterElements(m: MeterState, p: Probes): Element[] {
  * Una lettura. «scene» è il circuito sul banco; «capV» la tensione dei condensatori in questo momento; «dt», se c'è,
  * fa passare quel tempo (i condensatori si caricano attraverso il multimetro: la lettura in ohm sale da sola).
  */
-export function read(scene: Element[], m: MeterState, p: Probes, o: { capV?: Record<string, number>; dt?: number } = {}): Reading {
-  const con = meterElements(m, p), opts = { capV: o.capV, dt: o.dt, ground: p.black ?? undefined };
-  const sol = solve([...scene, ...con], opts);
+export function read(scene: Element[], m: MeterState, p: Probes, o: { capV?: Record<string, number>; dt?: number; time?: number; solution?: Solution; values?: number[] } = {}): Reading {
+  const con = meterElements(m, p), opts = { capV: o.capV, dt: o.dt, time: o.time, ground: p.black ?? undefined };
+  const sol = o.solution ?? solve([...scene, ...con], opts);
   const between = (s: Solution): number => p.red && p.black ? (s.v[p.red] ?? 0) - (s.v[p.black] ?? 0) : 0;
   const out = (f: { display: string; unit: string }, value: number, note: Note = 'ok', extra: Partial<Reading> = {}): Reading => ({ ...f, value, beep: false, note, blew: null, solution: sol, ...extra });
   const attaccato = Boolean(p.red && p.black);
@@ -67,7 +69,7 @@ export function read(scene: Element[], m: MeterState, p: Probes, o: { capV?: Rec
     const limit = m.jack === 'ma' ? METER.fuseMaAmp : METER.fuseAAmp;
     if (Math.abs(i) > limit) {
       const dopo = { ...m, fuseMaBlown: m.fuseMaBlown || m.jack === 'ma', fuseABlown: m.fuseABlown || m.jack === 'a' };
-      const r = read(scene, dopo, p, o);
+      const r = read(scene, dopo, p, { ...o, solution: undefined, values: undefined });
       return { ...r, note: 'fuse', blew: m.jack };
     }
     if (m.dial === m.jack) return out(formatAmp(blown ? 0 : i, m.jack), blown ? 0 : i, blown ? 'fuseBlown' : attaccato ? 'ok' : 'open');
@@ -78,11 +80,20 @@ export function read(scene: Element[], m: MeterState, p: Probes, o: { capV?: Rec
   }
   // --- puntale rosso nella boccola VΩ
   if (m.dial === 'ma' || m.dial === 'a') return out(formatAmp(0, m.dial), 0, 'jack');       // lo shunt non è collegato: il circuito resta aperto
-  if (m.dial === 'vdc') return out(formatVolt(between(sol)), between(sol), attaccato ? 'ok' : 'open');
-  if (m.dial === 'vac') { const ac = solve([...scene, ...con], { ground: p.black ?? undefined, ac: true }), v = Math.abs(between(ac)); return out(formatVolt(v), v, attaccato ? 'ok' : 'open'); }
+  if (m.dial === 'vdc' || m.dial === 'vac') {
+    let values = o.values;
+    // In presenza di alternata si misura la forma d'onda caricata dal voltmetro, anche dopo un raddrizzatore.
+    if (!values && scene.some(e => e.kind === 'V' && e.ac)) {
+      const circuit = [...scene, ...con], initial = simulate(circuit, TRANSIENT.settleSeconds).state;
+      values = simulate(circuit, measurementWindow(circuit), initial).samples.map(s => between({ ...sol, v: s.v }));
+    }
+    const stats = waveformStats(values ?? [between(sol)]);
+    const v = m.dial === 'vac' ? stats.acRms : stats.mean;
+    return out(formatVolt(v), v, attaccato ? 'ok' : 'open');
+  }
   if (!attaccato) return out(m.dial === 'cap' ? formatFarad(0) : { display: 'OL', unit: m.dial === 'diode' ? 'V' : 'MΩ' }, m.dial === 'cap' ? 0 : NaN, 'open');
   // tensione che c'era già fra i puntali, senza il multimetro: se c'è, ohm, continuità e capacità non valgono
-  const acceso = Math.abs(between(solve([...scene, { id: 'M.in', kind: 'R', a: p.red!, b: p.black!, ohm: METER.inputOhm }], { ground: p.black!, capV: o.capV, dt: o.dt }))) > METER.liveOhmsVolt;
+  const acceso = scene.some(e => e.kind === 'V' && e.ac && e.volt !== 0) || Math.abs(between(solve([...scene, { id: 'M.in', kind: 'R', a: p.red!, b: p.black!, ohm: METER.inputOhm }], { ground: p.black!, capV: o.capV, dt: o.dt }))) > METER.liveOhmsVolt;
   if (m.dial === 'ohm' || m.dial === 'cont') {
     const v = between(sol), i = sol.current('M.src'), r = p.red === p.black ? 0 : i > 1e-13 ? v / i : Infinity;
     if (m.dial === 'ohm') return out(r < 0 ? { display: comma(r, 1), unit: 'Ω' } : formatOhm(r), r, acceso ? 'live' : 'ok');
