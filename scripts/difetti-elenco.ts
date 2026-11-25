@@ -71,4 +71,7 @@ export const DIFETTI: Difetto[] = [
   { nome: 'un risultato peggiore cancella il migliore', file: 'save.ts', da: '[id]: Math.max(s.stars[id] ?? 0, Math.min(3, Math.floor(stars)))', a: '[id]: Math.min(3, Math.floor(stars))' },
   { nome: 'un salvataggio rotto fa cadere il gioco', file: 'save.ts', da: '  try { d = JSON.parse(text); } catch { return s; }', a: '  d = JSON.parse(text);' },
   { nome: 'un pezzo solo resta in un angolo', file: 'scene.ts', da: 'x0 = (width - (parts.length - 1) * passo) / 2;', a: 'x0 = 120;' },
+  { nome: 'il valore misurato al posto del nominale non ha spiegazione', file: 'exercises.ts', da: '<= Math.abs(q.near.value) * q.near.tolerancePct / 100 ? q.near.message : null;', a: '<= 0 ? q.near.message : null;' },
+  { nome: 'la spiegazione arriva anche alle risposte giuste', file: 'exercises.ts', da: "if (q.kind !== 'number' || !q.near || checkAnswer(q, answer)) return null;", a: "if (q.kind !== 'number' || !q.near) return null;" },
+  { nome: 'il verdetto non porta la spiegazione', file: 'game.ts', da: 'feedback: correct ? null : feedbackFor(b.exercise.question, value) };', a: 'feedback: null };' },
 ];

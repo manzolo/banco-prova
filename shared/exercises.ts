@@ -7,7 +7,9 @@ import { battery, bjt, capacitor, diode, fuse, inductor, resistor, si, toggle, t
 import { loop, row, sceneElements, type Scene } from './scene.ts';
 
 export type Question =
-  | { kind: 'number'; unit: string; expected: number; tolerancePct: number }      // expected nell'unità indicata
+  | { kind: 'number'; unit: string; expected: number; tolerancePct: number;      // expected nell'unità indicata
+      /** Una risposta sbagliata ma prevedibile (per esempio il valore misurato al posto del nominale), con cosa dire. */
+      near?: { value: number; tolerancePct: number; message: string } }
   | { kind: 'choice'; options: string[]; correct: number };
 export interface Exercise {
   id: string; chapter: string; title: string; text: string;
@@ -39,10 +41,12 @@ export const EXERCISES: ExerciseDef[] = [
   def('colori', 'Resistenze', 'Il codice colori', r => {
     const ohm = e12(r, 1, 5), p = resistor('R1', ohm, 5, { factor: 1 + (r() - 0.5) * 0.06 });
     const unit = ohm >= 1e6 ? 'MΩ' : ohm >= 1e3 ? 'kΩ' : 'Ω', scala = ohm >= 1e6 ? 1e6 : ohm >= 1e3 ? 1e3 : 1;
-    return { text: 'Leggi le bande della resistenza: quanto vale secondo il codice colori? Poi controlla col multimetro.',
+    const vero = (p.truth.real as number) / scala;
+    return { text: `Leggi le bande della resistenza: qual è il suo valore nominale, cioè quello scritto dai colori? Scrivilo in ${unit}. Il multimetro serve a controllare: il pezzo vero si scosta un po' dal nominale, dentro la tolleranza.`,
       hint: 'Le prime due bande sono le cifre, la terza dice quanti zeri aggiungere, la quarta (staccata) è la tolleranza. Per controllare: selettore su Ω, un puntale per piedino.',
       explain: `${p.mark}: ${si(ohm, 'Ω')}, tolleranza 5%. Il multimetro legge il valore vero di questo pezzo, ${si(p.truth.real as number, 'Ω')}: dentro la tolleranza non è mai identico al nominale.`,
-      scene: row([p]), question: { kind: 'number', unit, expected: ohm / scala, tolerancePct: 0.5 } };
+      scene: row([p]), question: { kind: 'number', unit, expected: ohm / scala, tolerancePct: 0.5,
+        near: { value: vero, tolerancePct: 1, message: 'Questo è il valore misurato, quello vero di questo pezzo. La domanda chiede il nominale: quello che dicono le bande, un numero tondo della serie E12.' } } };
   }),
   def('tolleranza', 'Resistenze', 'È in tolleranza?', r => {
     const ohm = e12(r, 1, 4), buona = r() < 0.5, p = resistor('R1', ohm, 5, buona ? { factor: 1 + (r() - 0.5) * 0.07 } : { fault: 'drift' });
@@ -96,10 +100,11 @@ export const EXERCISES: ExerciseDef[] = [
   // ------------------------------------------------------------ condensatori e bobine
   def('codice-condensatore', 'Condensatori e bobine', 'Il codice a tre cifre', r => {
     const farad = pick(r, [1, 2.2, 4.7, 10, 22, 47, 100, 220, 470]) * 1e-9, p = capacitor('C1', farad, 'ceramic', { factor: 1 + (r() - 0.5) * 0.12 });
-    return { text: `Sul condensatore ceramico c'è scritto ${p.mark}. Quanti nanofarad sono? Poi controlla col capacimetro.`,
+    return { text: `Sul condensatore ceramico c'è scritto ${p.mark}. Quanti nanofarad vale secondo il codice? Il capacimetro serve a controllare: il pezzo vero si scosta dal valore scritto.`,
       hint: 'Le prime due cifre sono il valore, la terza il numero di zeri: il risultato è in picofarad. Mille picofarad fanno un nanofarad. Per controllare: selettore su ⊣⊢ (capacità).',
       explain: `${p.mark}: ${p.mark.slice(0, 2)} seguito da ${p.mark[2]} zeri, in picofarad, cioè ${si(farad, 'F')}. Il capacimetro legge ${si(p.truth.real as number, 'F')}: i ceramici hanno tolleranze larghe.`,
-      scene: row([p]), question: { kind: 'number', unit: 'nF', expected: farad * 1e9, tolerancePct: 0.5 } };
+      scene: row([p]), question: { kind: 'number', unit: 'nF', expected: farad * 1e9, tolerancePct: 0.5,
+        near: { value: (p.truth.real as number) * 1e9, tolerancePct: 1, message: 'Questo è il valore misurato dal capacimetro. La domanda chiede quello scritto dal codice a tre cifre.' } } };
   }),
   def('elettrolitici', 'Condensatori e bobine', 'Tre elettrolitici', r => {
     const ordine = shuffle(r, ['good', 'short', 'dry'] as const), farad = pick(r, [100e-6, 220e-6, 470e-6]);
@@ -197,6 +202,12 @@ export function buildExercise(id: string, variant: number): Exercise {
 export function checkAnswer(q: Question, answer: number): boolean {
   if (q.kind === 'choice') return answer === q.correct;
   return Math.abs(answer - q.expected) <= Math.abs(q.expected) * q.tolerancePct / 100 + 1e-12;
+}
+
+/** Cosa dire dopo una risposta sbagliata: se è lo sbaglio previsto, la spiegazione; se no, null. */
+export function feedbackFor(q: Question, answer: number): string | null {
+  if (q.kind !== 'number' || !q.near || checkAnswer(q, answer)) return null;
+  return Math.abs(answer - q.near.value) <= Math.abs(q.near.value) * q.near.tolerancePct / 100 ? q.near.message : null;
 }
 
 /** I componenti che si possono mettere sul banco libero, uno alla volta. */

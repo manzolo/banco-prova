@@ -2,7 +2,7 @@
 // verità del componente. Per ognuno c'è qui il procedimento che farebbe una persona, scritto come misure.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHAPTERS, DRAWER, EXERCISES, buildExercise, checkAnswer, rng, type Exercise } from '../shared/exercises.ts';
+import { CHAPTERS, DRAWER, EXERCISES, buildExercise, checkAnswer, feedbackFor, rng, type Exercise } from '../shared/exercises.ts';
 import { NEW_METER, read, type Dial, type Jack, type Reading } from '../shared/meter.ts';
 import { decodeBands, decodeCapacitorCode } from '../shared/parts.ts';
 import { flipSwitch, loop, padPositions, row, sceneElements, scenePads, type Scene } from '../shared/scene.ts';
@@ -108,4 +108,22 @@ test('l\'anello: il generatore, i pezzi in serie, quelli in parallelo e la chius
 test('il cassetto del banco libero: quindici pezzi, tutti misurabili', () => {
   assert.equal(DRAWER.length, 15); assert.equal(new Set(DRAWER.map(d => d.id)).size, 15);
   for (const d of DRAWER) { const s = row([d.make()]); assert.ok(scenePads(s).length >= 2, d.name); assert.ok(Number.isFinite(misura(s, 'vdc', s.parts[0].pads[0], s.parts[0].pads[1]).value), d.name); }
+});
+
+test('chi scrive il valore misurato al posto del nominale viene corretto con una spiegazione, non con un «no» e basta', () => {
+  for (let v = 0; v < 20; v++) {
+    const e = buildExercise('colori', v), q = e.question as { expected: number; unit: string; tolerancePct: number }, [a, b] = e.scene.parts[0].pads;
+    const scala = q.unit === 'MΩ' ? 1e6 : q.unit === 'kΩ' ? 1e3 : 1, letto = misura(e.scene, 'ohm', a, b).value / scala;
+    if (checkAnswer(e.question, letto)) continue;                       // il pezzo è quasi esatto: il valore letto va bene anche come risposta
+    assert.match(feedbackFor(e.question, letto) ?? '', /valore misurato/, `variante ${v}: ${letto} invece di ${q.expected}`);
+    assert.equal(feedbackFor(e.question, q.expected * 3), null, 'uno sbaglio qualunque non ha spiegazioni');
+  }
+  const e = buildExercise('colori', 0), q = e.question as { expected: number };
+  assert.equal(feedbackFor(e.question, q.expected), null, 'una risposta giusta non ha bisogno di spiegazioni');
+  assert.equal(feedbackFor(buildExercise('interrotta', 0).question, 0), null, 'le domande a scelta non ne hanno');
+  for (let v = 0; v < 20; v++) {
+    const c = buildExercise('codice-condensatore', v), real = (c.scene.parts[0].truth.real as number) * 1e9;
+    if (!checkAnswer(c.question, real)) assert.match(feedbackFor(c.question, real) ?? '', /capacimetro/, `condensatore, variante ${v}`);
+  }
+  assert.match(buildExercise('colori', 0).text, /nominale/, 'il testo dice che si vuole il nominale');
 });

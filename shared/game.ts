@@ -1,6 +1,6 @@
 // Lo stato del banco e le sue azioni: funzioni pure. Il client chiama apply() per ogni gesto e tick() a ogni passo:
 // tick fa passare il tempo (i condensatori si caricano attraverso il multimetro) e restituisce la lettura.
-import { buildExercise, checkAnswer, DRAWER, type Exercise } from './exercises.ts';
+import { buildExercise, checkAnswer, DRAWER, feedbackFor, type Exercise } from './exercises.ts';
 import { NEW_METER, read, type Dial, type Jack, type MeterState, type Probes, type Reading } from './meter.ts';
 import { flipSwitch, row, sceneElements, scenePads, type Scene } from './scene.ts';
 
@@ -56,11 +56,11 @@ export function partCurrent(reading: Reading, partId: string): number {
   return Math.abs(reading.solution.current(`${partId}.d`));
 }
 
-export interface Verdict { correct: boolean; stars: 0 | 1 | 2 | 3; bench: Bench }
+export interface Verdict { correct: boolean; stars: 0 | 1 | 2 | 3; bench: Bench; feedback: string | null }
 /** Dà la risposta all'esercizio. Tre stelle al primo colpo senza aiuto; una in meno con l'aiuto, una in meno dal secondo tentativo, una in meno se si è bruciato un fusibile; mai meno di una se è giusta. */
 export function answer(b: Bench, value: number): Verdict {
-  if (!b.exercise || b.solved) return { correct: false, stars: 0, bench: b };
+  if (!b.exercise || b.solved) return { correct: false, stars: 0, bench: b, feedback: null };
   const correct = checkAnswer(b.exercise.question, value), tries = b.tries + 1;
   const stars = correct ? Math.max(1, 3 - (b.usedHint ? 1 : 0) - (tries > 1 ? 1 : 0) - (b.fusesBlown > 0 ? 1 : 0)) as 1 | 2 | 3 : 0;
-  return { correct, stars, bench: { ...b, tries, solved: correct } };
+  return { correct, stars, bench: { ...b, tries, solved: correct }, feedback: correct ? null : feedbackFor(b.exercise.question, value) };
 }

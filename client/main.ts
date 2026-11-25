@@ -12,7 +12,7 @@ import { h, stelle } from './ui.ts';
 type View = 'menu' | 'banco' | 'come';
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const S = { tick: 0, view: 'menu' as View, save: leggi(), bench: null as Bench | null, reading: null as Reading | null, drawer: DRAWER[0].id, probe: 'red' as 'red' | 'black', version: '',
-  esito: null as { correct: boolean; stars: number } | null };
+  esito: null as { correct: boolean; stars: number; feedback: string | null } | null };
 setSound(S.save.sound);
 
 function leggi(): Save { try { return parseSave(localStorage.getItem(SAVE_KEY)); } catch { return parseSave(null); } }
@@ -125,7 +125,7 @@ function mostraBanco(): void {
         kids.push(h('div', { class: 'numero' }, campo, h('span', { class: 'unita' }, q.unit), h('button', { class: 'conferma', id: 'conferma', onclick: invia }, 'Rispondi')));
       }
     }
-    if (S.esito && !S.esito.correct) kids.push(h('p', { class: 'esito male', id: 'esito' }, 'Non è questa. Rimisura con calma: l\'esercizio resta lì.'));
+    if (S.esito && !S.esito.correct) kids.push(h('p', { class: 'esito male', id: 'esito' }, S.esito.feedback ?? 'Non è questa. Rimisura con calma: l\'esercizio resta lì.'));
     if (S.esito?.correct) kids.push(h('div', { class: 'esito bene', id: 'esito' }, h('b', {}, `Giusto ${stelle(S.esito.stars)}`), h('p', {}, e.explain),
       b.fusesBlown ? h('small', {}, 'Un fusibile bruciato è costato una stella.') : null),
       h('div', { class: 'azioni' }, h('button', { class: 'conferma', id: 'altra', onclick: () => comincia(e.id) }, 'Un\'altra variante'),
@@ -133,7 +133,7 @@ function mostraBanco(): void {
     domanda.replaceChildren(...kids.filter((k): k is Node => k !== null));
   };
   const rispondi = (valore: number): void => {
-    const v = answer(S.bench!, valore); S.bench = v.bench; S.esito = { correct: v.correct, stars: v.stars };
+    const v = answer(S.bench!, valore); S.bench = v.bench; S.esito = { correct: v.correct, stars: v.stars, feedback: v.feedback };
     if (v.correct) { S.save = recordSolved(S.save, v.bench.exercise!.id, v.stars); scrivi(); chime(v.stars); } else buzz();
     riempiDomanda();
   };

@@ -54,8 +54,9 @@ try {
     await page.screenshot({ path: `${scatti}/02-resistenza.png`, fullPage: true });
     await page.fill('#risposta', '0,001'); await page.click('#conferma');
     assert.match(await page.locator('#esito').innerText(), /Non è questa/);
+    if (Math.abs(r.value / scala - q.expected) > q.expected * 0.005) { await page.fill('#risposta', (r.value / scala).toFixed(2)); await page.click('#conferma'); assert.match(await page.locator('#esito').innerText(), /valore misurato/, 'scritto il valore letto: il gioco spiega'); }
     await page.fill('#risposta', String(q.expected).replace('.', ',')); await page.click('#conferma');
-    assert.match(await page.locator('#esito').innerText(), /Giusto ★★☆/, 'al secondo tentativo: due stelle');
+    assert.match(await page.locator('#esito').innerText(), /Giusto ★★☆/, 'dopo uno sbaglio: due stelle');
     assert.equal(await banco(page, g => g.stato.save.stars.colori), 2);
     await page.reload(); await page.locator('.esercizio[data-id=colori]').waitFor();
     assert.match(await page.locator('.esercizio[data-id=colori]').innerText(), /★★☆/, 'dopo aver ricaricato le stelle ci sono ancora');

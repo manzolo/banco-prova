@@ -57,6 +57,8 @@ test('la risposta e le stelle: tre al primo colpo, meno con l\'aiuto, coi tentat
   assert.equal(answer({ ...b, fusesBlown: 1 }, giusta).stars, 2); assert.equal(answer({ ...apply(err.bench, { type: 'hint' }), fusesBlown: 2 }, giusta).stars, 1, 'mai meno di una, se è giusta');
   assert.equal(answer(v.bench, giusta).stars, 0, 'un esercizio già risolto non si rivince'); assert.equal(answer(newBench(null), 1).correct, false, 'sul banco libero non c\'è niente da rispondere');
   assert.equal(answer(newBench('colori', 0), NaN).correct, false);
+  const col = newBench('colori', 0), reale = (col.exercise!.scene.parts[0].truth.real as number) / ((col.exercise!.question as { unit: string }).unit === 'MΩ' ? 1e6 : (col.exercise!.question as { unit: string }).unit === 'kΩ' ? 1e3 : 1);
+  const sb = answer(col, reale); if (!sb.correct) assert.match(sb.feedback ?? '', /valore misurato/, 'il verdetto porta la spiegazione'); assert.equal(answer(col, 1e9).feedback, null);
 });
 
 test('il salvataggio: vuoto, andata e ritorno, il migliore resta e le varianti si contano', () => {
