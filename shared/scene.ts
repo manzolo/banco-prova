@@ -30,9 +30,9 @@ export function scenePads(s: Scene): { node: string; partId: string; index: numb
 
 /** Pezzi sciolti, in fila, non collegati fra loro. */
 export function row(parts: Part[]): Scene {
-  const passo = 190, place: Scene['place'] = {};
-  parts.forEach((p, i) => { place[p.id] = { x: 120 + i * passo, y: 110, vertical: false }; });
-  return { parts, wires: [], place, lines: [], width: Math.max(560, 240 + (parts.length - 1) * passo), height: 220 };
+  const passo = 190, place: Scene['place'] = {}, width = Math.max(420, 240 + (parts.length - 1) * passo), x0 = (width - (parts.length - 1) * passo) / 2;
+  parts.forEach((p, i) => { place[p.id] = { x: x0 + i * passo, y: 110, vertical: false }; });      // centrati nella scena
+  return { parts, wires: [], place, lines: [], width, height: 220 };
 }
 
 /**

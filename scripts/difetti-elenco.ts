@@ -70,4 +70,5 @@ export const DIFETTI: Difetto[] = [
   { nome: 'le stelle fuori scala entrano nel salvataggio', file: 'save.ts', da: '&& n >= 1 && n <= 3) s.stars[id] = n;', a: '&& n >= 1) s.stars[id] = n;' },
   { nome: 'un risultato peggiore cancella il migliore', file: 'save.ts', da: '[id]: Math.max(s.stars[id] ?? 0, Math.min(3, Math.floor(stars)))', a: '[id]: Math.min(3, Math.floor(stars))' },
   { nome: 'un salvataggio rotto fa cadere il gioco', file: 'save.ts', da: '  try { d = JSON.parse(text); } catch { return s; }', a: '  d = JSON.parse(text);' },
+  { nome: 'un pezzo solo resta in un angolo', file: 'scene.ts', da: 'x0 = (width - (parts.length - 1) * passo) / 2;', a: 'x0 = 120;' },
 ];

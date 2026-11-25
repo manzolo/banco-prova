@@ -1,23 +1,22 @@
-# CQ CQ — regole per gli agenti
+# Banco di prova — regole per gli agenti
 
 - Tutto ciò che si legge è in italiano (interfaccia, README, `docs/`, commenti, commit, nomi delle prove).
   **Identificatori, nomi dei file e campi dei dati in inglese.**
 - Node 26 da nvm: `export PATH=/home/manzolo/.nvm/versions/node/v26.13.0/bin:$PATH` prima di `npm`/`node`
   (il `Makefile` lo fa da solo).
-- Gioco sulla porta 8801, Vite in sviluppo sulla 5181. Container e immagine `cq-cq`.
+- Gioco sulla porta 8803, Vite in sviluppo sulla 5183. Container e immagine `banco-prova`.
 - **Il modello sta in `shared/`**: funzioni pure e deterministiche, senza DOM e senza orologio. Tutti i numeri
-  (fattori, Q, soglie, tabelle dei cavi e della ionosfera) stanno in `shared/config.ts`. `client/` disegna e
-  raccoglie i comandi: non calcola niente di fisico.
-- **Ogni formula ha tre cose**: il commento con la formula e le unità, una prova in `tests/` con un valore noto
-  (il conto nel commento), e la sua riga in `docs/MODELLO.md` con il grado di fiducia (esatta di manuale,
-  approssimazione ingegneristica, regola empirica). Le regole critiche hanno anche un difetto in
-  `scripts/difetti-elenco.ts`, che la prova deve cogliere.
-- **Onestà del modello**: è didattico, non una previsione. Una regola empirica si dichiara tale anche nel gioco
-  (pagina «come calcola»). Fuori dai limiti del modello si dice «qui il modello non arriva», non si inventa un
-  numero. Se cambi una formula o una tabella, aggiorna `docs/MODELLO.md` nello stesso commit.
-- La grafica disegna le funzioni del modello (per esempio il profilo dell'onda stazionaria), non effetti finti.
-- Le bande e i segmenti di `shared/bands.ts` sono una copia del band plan del gemello: in testa al file c'è da
-  dove vengono e la data. Si correggono là e si ricopiano, non si divergono qui.
+  (multimetro, diodi, fusibili) stanno in `shared/config.ts`. `client/` disegna e raccoglie i gesti: non calcola
+  niente di elettrico.
+- **Il multimetro non legge i valori dei componenti**: entra nel circuito come un elemento in più e mostra quello
+  che il risolutore ne ricava. Non aggiungere scorciatoie («se è una resistenza, mostra il suo valore»): è così che
+  gli errori veri hanno le conseguenze vere.
+- **Ogni regola ha tre cose**: il commento, una prova in `tests/` con un valore noto, e la sua riga in
+  `docs/MODELLO.md`. Le regole critiche hanno anche un difetto in `scripts/difetti-elenco.ts`.
+- **Ogni esercizio deve risolversi col multimetro e solo con quello**: in `tests/esercizi.test.ts` c'è, per ognuno,
+  il procedimento scritto come misure, provato su venti varianti. Un esercizio nuovo entra col suo procedimento.
+- **Onestà del modello**: solo continua, valori tipici e non di uno strumento preciso; lo dice la pagina «come
+  funziona». Niente esercizi sulla tensione di rete.
 - Niente risorse scaricate, salvo dati di pubblico dominio o CC0 documentati in `ASSET_LICENSES.md`.
   Suoni sintetizzati in WebAudio. Mai chiedere chiavi API o account.
 - `prompts/` e `assets/raw/` non vanno né nel repo né nell'immagine Docker.

@@ -89,6 +89,7 @@ test('la fila: pezzi sciolti, non collegati, ognuno coi suoi piedini', () => {
   const s = row([resistor('R1', 100), resistor('R2', 220), diode('D1', '1N4148')]);
   assert.equal(s.wires.length, 0); assert.equal(scenePads(s).length, 6); assert.deepEqual(s.place.R2, { x: 310, y: 110, vertical: false });
   assert.deepEqual(padPositions(s.parts[0], s.place.R1).map(p => [p.x, p.y]), [[70, 110], [170, 110]]);
+  assert.equal(row([resistor('R1', 100)]).place.R1.x, 210, 'un pezzo solo sta al centro di una scena larga 420'); assert.equal(row([resistor('R1', 100)]).width, 420);
   assert.equal(misura(s, 'ohm', 'R1.1', 'R2.2').display, 'OL', 'fra due pezzi diversi non c\'è collegamento');
 });
 
