@@ -1,7 +1,10 @@
 # Banco di prova — stato dei lavori
 
-**Prima versione completa e giocabile in locale (2026-11-25), v0.1.0, niente push.** Nome provvisorio, scelto da
-Claude: lo conferma o lo cambia Andrea. Ampliata con alternata nel tempo e oscilloscopio: 75 prove del modello, 101 difetti iniettati e 14 prove nel browser (anche a 390 px). `make test-all` riuscito: compilazione, 75/75 prove, 101/101 difetti colti e 14/14 prove nel browser.
+**Versione 0.2 (2026-11-25), pubblicata su GitHub Pages** col sì di Andrea: <https://manzolo.github.io/banco-prova/>,
+repo pubblico `github.com/manzolo/banco-prova`, licenza MIT. Italiano di default, inglese a scelta (tasto nel menu o
+`?lang=en`). Nome provvisorio, scelto da Claude: lo conferma o lo cambia Andrea. Accolte una revisione critica
+(sull'oscilloscopio e gli esercizi nuovi, fatta da un agente perché Codex aveva finito il credito) e la richiesta di
+Andrea di avere aiutini e appunti.
 
 ## Che cosa c'è
 
@@ -15,9 +18,11 @@ Claude: lo conferma o lo cambia Andrea. Ampliata con alternata nel tempo e oscil
   cicalino, prova diodi, capacità, corrente su due boccole coi loro fusibili; display a 4000 punti.
 - `shared/scene.ts`: la fila di pezzi sciolti e il circuito ad anello, con la geometria per disegnarli.
 - `shared/exercises.ts`: ventiquattro esercizi in sette capitoli, ognuno con varianti ripetibili, più il cassetto del banco
-  libero (quindici pezzi).
+  libero (sedici pezzi, col generatore di funzioni). Testi in italiano e inglese.
 - `shared/game.ts`, `shared/save.ts`: lo stato del banco, le stelle, il salvataggio con versione.
-- `client/`: menu, banco in SVG, multimetro, pannello delle domande, pagina «come funziona», suoni. Oscilloscopio SVG 10×8 con scale, trigger, due coppie di sonde e selettori dei piedini accessibili anche sul telefono.
+- `client/`: menu, banco in SVG, multimetro, pannello delle domande, pagina «come funziona», suoni; `i18n.ts`
+  (italiano e inglese), `aiutini.ts` (il «?» sul banco: tabelle in sovraimpressione, gratis), `appunti.ts` (la teoria
+  degli esercizi con un esempio per argomento, scritta per il gioco: la dispensa del corso ARI non va pubblicata). Oscilloscopio SVG 10×8 con scale, trigger, due coppie di sonde e selettori dei piedini accessibili anche sul telefono.
 
 ## Nuovo capitolo: Alternata e oscilloscopio
 
@@ -45,12 +50,24 @@ Le sonde restano collegate mentre si usa il multimetro: tutti gli ingressi caric
 2. Transitori delle bobine, solo insieme a esercizi dedicati; ESR del filtro e banda passante degli strumenti.
 3. Pinza amperometrica e capitolo sulle saldature fredde e sui falsi contatti.
 
+## La revisione critica dell'oscilloscopio (2026-11-25)
+
+Accolte: fusibile che salta in alternata senza annunciarsi; accoppiamento AC su un numero intero di periodi; esercizi
+vincibili senza misurare (trasformatore realistico a vuoto, domanda sul picco, carichi della semionda che spostano la
+caduta, niente misure automatiche negli esercizi ma cursori, suddivisioni sul reticolo); falso «circuito acceso» mentre
+l'ohmetro carica il condensatore; masse delle sonde in comune; pannello dell'oscilloscopio solo dove serve; sonda,
+poi massa, poi di nuovo il multimetro; formula del ripple dichiarata come stima per eccesso; valori del filtro in
+ohm; generatore di funzioni al posto del trasformatore a 100 e 1000 Hz; registrazione che non si cancella girando il
+selettore; procedimenti delle prove che leggono la traccia coi cursori sul percorso vero del banco. Non accolte: le
+misure di prestazione sul telefono (da guardare giocando); l'amperometro nel tempo mostra ancora la corrente
+istantanea (dichiarato nella pagina «come funziona»).
+
+## Pubblicare
+
+Su GitHub Pages: `make bump PARTE=minor` (verifica, commit, tag), poi `git push github main --tags`. Il flusso
+`.github/workflows/pages.yml` ricontrolla (compilazione, prove, difetti, file pubblicabili) e pubblica la cartella
+`dist`. Le prove nel browser si fanno in locale prima del tag.
+
 ## Da decidere con Andrea
 
-- Il nome. Poi repo, sottodominio, `make deploy` e voce in vetrina, come per CQ CQ.
-
-## Note di questa modifica
-
-Nessuna operazione Git, commit o pubblicazione. `DEPLOY_VER` nel Makefile viene ora valutato soltanto quando
-serve alla pubblicazione: `make test-all` non esegue più implicitamente `git show` durante la lettura del file.
-Le prove nel browser avviano un server temporaneo e lo chiudono al termine. Nessuna risorsa esterna aggiunta.
+- Il nome definitivo. La voce nella vetrina di manzolo.it.

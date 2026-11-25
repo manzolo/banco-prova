@@ -51,6 +51,13 @@ try {
     const scala = q.unit === 'MΩ' ? 1e6 : q.unit === 'kΩ' ? 1e3 : 1;
     assert.ok(Math.abs(r.value / scala - q.expected) < q.expected * 0.05, `il multimetro legge ${r.value} Ω, il nominale è ${q.expected} ${q.unit}`);
     assert.equal(await page.locator('#lcd').innerText(), r.display); assert.equal(await page.locator('.puntale').count(), 2);
+    await page.click('#aiutino-tasto'); await page.locator('#aiutino').waitFor();
+    assert.match(await page.locator('#aiutino').innerText(), /codice colori[\s\S]*giallo[\s\S]*4700 Ω/, 'il «?» apre la tabella dei colori');
+    assert.equal(await page.locator('.aiutino .scheda.scelto').innerText(), 'Colori');
+    await page.screenshot({ path: `${scatti}/02b-aiutino-colori.png`, fullPage: true });
+    await page.click('.aiutino .scheda[data-carta=selettore]'); assert.match(await page.locator('#aiutino').innerText(), /in SERIE/);
+    await page.click('.aiutino .chiudi'); assert.equal(await page.locator('#aiutino').isHidden(), true);
+    assert.doesNotMatch(await page.locator('#esito').count() ? await page.locator('#esito').innerText() : '', /costata/, 'l\'aiutino non costa stelle');
     await page.screenshot({ path: `${scatti}/02-resistenza.png`, fullPage: true });
     await page.fill('#risposta', '0,001'); await page.click('#conferma');
     assert.match(await page.locator('#esito').innerText(), /Non è questa/);
@@ -96,7 +103,7 @@ try {
     assert.ok(Math.abs((await lettura(page)).value - 9.38) < 0.05, 'la pila a vuoto');
     await page.click('.boccola[data-jack=ma]'); await passi(page, 6);
     assert.equal(await banco(page, g => g.stato.bench!.meter.fuseMaBlown), true); assert.equal(await banco(page, g => g.stato.bench!.fusesBlown), 1);
-    await page.locator('#cambia-ma').waitFor(); assert.match(await page.locator('#nota').innerText(), /PUM|boccola di corrente|cortocircuito/);
+    await page.locator('#cambia-ma').waitFor(); assert.match(await page.locator('#nota').innerText(), /PUM/); await passi(page, 30); assert.match(await page.locator('#nota').innerText(), /PUM/, 'il messaggio del fusibile resta visibile');
     await page.screenshot({ path: `${scatti}/05-fusibile-saltato.png`, fullPage: true });
     await page.click('.boccola[data-jack=v]'); await page.click('#cambia-ma'); await passi(page, 6);
     assert.equal(await banco(page, g => g.stato.bench!.meter.fuseMaBlown), false); assert.equal(await page.locator('#cambia-ma').count(), 0);
@@ -127,6 +134,13 @@ try {
     await page.click(`.scelta[data-scelta="${giusta}"]`); assert.match(await page.locator('#esito').innerText(), /Giusto ★★☆/);
   });
 
+  await prova('gli appunti: dal menu, con la teoria e gli esempi, anche in inglese', async () => {
+    await page.click('#al-menu'); await page.click('#vai-appunti'); await page.locator('.appunti').waitFor();
+    const t = await page.locator('.appunti').innerText();
+    for (const parola of ['legge di Ohm', 'Esempio', 'partitore', 'costante di tempo', 'anodo', 'valore efficace', 'ripple']) assert.ok(t.includes(parola), `manca «${parola}»`);
+    await page.screenshot({ path: `${scatti}/09b-appunti.png`, fullPage: true });
+  });
+
   await prova('la pagina «come funziona» dice cosa fa il multimetro e cosa manca', async () => {
     await page.click('#al-menu'); await page.click('#vai-come'); await page.locator('.come').waitFor();
     const t = await page.locator('.come').innerText();
@@ -154,63 +168,84 @@ try {
   });
 
 
-  await prova('oscilloscopio: due canali, puntali sui piedini, scale, accoppiamento e trigger', async () => {
+  // L'oscilloscopio si legge come una persona: la traccia disegnata e i cursori posati con un clic sullo schermo.
+  const traccia = async (p: Page, i = 0): Promise<{ x: number; y: number }[]> => ((await p.locator(`[data-trace="${i}"]`).getAttribute('points')) ?? '').trim().split(/\s+/).filter(Boolean).map(q => { const [x, y] = q.split(',').map(Number); return { x, y }; });
+  const clicca = async (p: Page, x: number, y: number): Promise<void> => {
+    await p.locator('#scope-screen').scrollIntoViewIfNeeded();      // il clic va dato dentro la finestra visibile
+    const c = await p.evaluate(([sx, sy]) => { const svg = document.querySelector('#scope-screen svg') as SVGSVGElement, pt = svg.createSVGPoint(); pt.x = sx; pt.y = sy; const q = pt.matrixTransform(svg.getScreenCTM()!); return { x: q.x, y: q.y }; }, [x, y]);
+    await p.mouse.click(c.x, c.y);
+  };
+  const cursori = async (p: Page): Promise<{ dv: number; dt: number; hz: number }> => { const t = await p.locator('#scope-cursori').innerText(), n = (re: RegExp): number => Number((t.match(re)?.[1] ?? 'NaN').replace(',', '.'));
+    return { dv: n(/ΔV ([\d,]+) V/), dt: n(/Δt ([\d,]+) ms/), hz: n(/1\/Δt ([\d,]+) Hz/) }; };
+  const cresta = (pp: { x: number; y: number }[]) => pp.reduce((a, q) => q.y < a.y ? q : a), valle = (pp: { x: number; y: number }[]) => pp.reduce((a, q) => q.y > a.y ? q : a);
+
+  await prova('oscilloscopio: due canali, le masse in comune, il picco coi cursori, scale e trigger', async () => {
     await page.goto(base); await page.click('.esercizio[data-id=ac-peak]');
-    await page.click('#scope-0-probe'); await piedino(page, 'T1.1').click();
-    await page.click('#scope-0-ground'); await piedino(page, 'T1.2').click();
-    await page.selectOption('#scope-1-probe-node', 'T1.2'); await page.selectOption('#scope-1-ground-node', 'T1.1');
+    await page.click('#scope-0-probe'); await piedino(page, 'T1.1').click(); await piedino(page, 'T1.2').click();     // dopo la sonda tocca alla massa da sola
+    assert.equal(await page.locator('#scope-0-ground-node').inputValue(), 'T1.2', 'posata la sonda, il tocco successivo posa la massa');
+    await page.selectOption('#scope-1-probe-node', 'T1.1'); await page.selectOption('#scope-1-ground-node', 'T1.2');
     await passi(page, 24);
-    assert.equal(await page.locator('#scope-screen polyline').count(), 2);
-    assert.equal(await page.locator('#scope-screen .scope-grid line').count(), 20);
-    assert.equal(await page.locator('.puntale[class*="scope-"]').count(), 4);
+    assert.equal(await page.locator('#scope-screen polyline').count(), 2); assert.equal(await page.locator('#scope-screen .scope-grid line:not(.tacca)').count(), 20);
+    assert.ok(await page.locator('#scope-screen .tacca').count() > 80, 'le suddivisioni sugli assi centrali');
+    assert.equal(await page.locator('#scope-stats-0').count() ? await page.locator('#scope-measures').isVisible() : false, false, 'negli esercizi niente misure automatiche');
     assert.match(await page.locator('#scope-status').innerText(), /agganciato/);
-    const points = await page.locator('[data-trace="0"]').getAttribute('points');
-    assert.ok(points && points.length > 500);
-    await page.selectOption('#scope-0-volt', '10'); await page.selectOption('#scope-time', '5');
-    await passi(page, 12); assert.notEqual(await page.locator('[data-trace="0"]').getAttribute('points'), points);
-    await page.fill('#scope-trigger', '100'); await page.locator('#scope-trigger').blur(); await passi(page, 6);
-    assert.match(await page.locator('#scope-status').innerText(), /Corsa libera/);
-    await page.fill('#scope-trigger', '0'); await page.locator('#scope-trigger').blur();
-    await page.selectOption('#scope-trigger-channel', '1'); await page.selectOption('#scope-0-coupling', 'ac'); await passi(page, 12);
-    assert.match(await page.locator('#scope-status').innerText(), /agganciato/);
+    const ampiezza = (pp: { y: number }[]): number => Math.max(...pp.map(q => q.y)) - Math.min(...pp.map(q => q.y)), prima = ampiezza(await traccia(page, 0));
+    await page.selectOption('#scope-1-ground-node', 'T1.1'); await passi(page, 24);
+    assert.ok(ampiezza(await traccia(page, 0)) < prima / 8, 'massa 2 sull\'altro capo: le masse in comune cortocircuitano il trasformatore e la traccia crolla');
+    await page.selectOption('#scope-1-ground-node', 'T1.2'); await page.selectOption('#scope-1-probe-node', ''); await passi(page, 24);
+    let pp: { x: number; y: number }[] = [];
+    for (const vd of ['1', '2', '5']) { await page.selectOption('#scope-0-volt', vd); await passi(page, 12); pp = await traccia(page); if (cresta(pp).y > 2) break; }   // la scala più piccola che tiene la cresta sullo schermo
+    const top = cresta(pp); assert.ok(top.y > 2, 'la cresta sta sullo schermo');
+    await clicca(page, top.x, top.y); await clicca(page, top.x, 200);
+    const c = await cursori(page), q = await banco(page, g => g.stato.bench!.exercise!.question as { expected: number });
+    assert.ok(Math.abs(c.dv - q.expected) < q.expected * 0.03, `coi cursori ΔV ${c.dv}, picco atteso ${q.expected}`);
     await page.click('.pos[data-dial=vac]'); await posa(page, 'T1.1', 'T1.2');
-    const measured = (await lettura(page)).value;
-    const peakText = await page.locator('#scope-stats-0').innerText();
-    const peak = Number(peakText.match(/max ([\d,]+) V/)![1].replace(',', '.'));
-    assert.ok(Math.abs(measured - peak / Math.SQRT2) < .01);
-    await page.fill('#risposta', String(peak / Math.SQRT2)); await page.click('#conferma');
-    assert.match(await page.locator('#esito').innerText(), /Giusto/);
+    assert.ok(Math.abs((await lettura(page)).value * Math.SQRT2 - q.expected) < q.expected * 0.01, 'V~ per √2 è il picco');
+    await page.fill('#risposta', String((q.expected / Math.SQRT2).toFixed(2))); await page.click('#conferma');
+    assert.match(await page.locator('#esito').innerText(), /valore efficace/, 'scritto l\'efficace al posto del picco: il gioco spiega');
+    await page.fill('#risposta', String(c.dv.toFixed(2))); await page.click('#conferma'); assert.match(await page.locator('#esito').innerText(), /Giusto/);
     await page.screenshot({ path: `${scatti}/11-oscilloscopio.png`, fullPage: true });
   });
 
-  await prova('frequenza: il periodo letto sullo schermo risolve la domanda', async () => {
+  await prova('frequenza: un periodo coi cursori fra due creste risolve la domanda', async () => {
     await page.click('#al-menu'); await page.click('.esercizio[data-id=ac-frequency]');
-    await page.selectOption('#scope-0-probe-node', 'T1.1'); await page.selectOption('#scope-0-ground-node', 'T1.2');
-    await passi(page, 18);
-    const t = await page.locator('#scope-stats-0').innerText();
-    const ms = Number(t.match(/periodo ([\d,]+) ms/)![1].replace(',', '.'));
-    await page.fill('#risposta', String(1000 / ms)); await page.click('#conferma');
-    assert.match(await page.locator('#esito').innerText(), /Giusto/);
+    await page.selectOption('#scope-0-probe-node', 'G1.1'); await page.selectOption('#scope-0-ground-node', 'G1.2'); await page.selectOption('#scope-0-volt', '1');
+    let hz = NaN;
+    for (const ms of ['5', '2', '0.5', '0.2']) {
+      await page.selectOption('#scope-time', ms); await passi(page, 18);
+      const pp = await traccia(page), top = Math.min(...pp.map(q => q.y)), creste = pp.filter((q, i) => i > 0 && i < pp.length - 1 && q.y <= pp[i - 1].y && q.y <= pp[i + 1].y && q.y < top + 2);
+      const a = creste[0], b = creste.find(q => q.x > a.x + 20);
+      if (a && b && b.x - a.x > 100) { await clicca(page, a.x, a.y); await clicca(page, b.x, b.y); hz = (await cursori(page)).hz; break; }
+    }
+    await page.fill('#risposta', String(Math.round(hz))); await page.click('#conferma');
+    assert.match(await page.locator('#esito').innerText(), /Giusto/, `letti ${hz} Hz`);
   });
 
-  await prova('ponte con filtro: ripple misurabile, meno con capacità doppia e più con carico maggiore', async () => {
+  await prova('ponte con filtro: il ripple coi cursori, meno con capacità doppia e più con carico maggiore', async () => {
     await page.click('#al-menu'); await page.click('.esercizio[data-id=bridge-ripple]');
     await page.selectOption('#scope-0-probe-node', 'C1.1'); await page.selectOption('#scope-0-ground-node', 'C1.2');
-    await page.selectOption('#scope-0-coupling', 'ac'); await page.selectOption('#scope-0-volt', '0.2');
-    const ripple = async () => { await passi(page, 30); const t = await page.locator('#scope-stats-0').innerText(); return Number(t.match(/picco-picco ([\d,]+) V/)![1].replace(',', '.')); };
-    const initial = await ripple(); assert.ok(initial > .05 && initial < 5);
+    await page.selectOption('#scope-0-coupling', 'ac'); await page.selectOption('#scope-0-volt', '0.5');
+    const ripple = async (): Promise<number> => { await passi(page, 40); const pp = await traccia(page); return (valle(pp).y - cresta(pp).y) / 50 * 0.5; };
+    const initial = await ripple(); assert.ok(initial > .05 && initial < 4, `ripple ${initial}`);
     await page.click('#filter-capacity'); const moreC = await ripple(); assert.ok(moreC < initial * .65);
     await page.click('#filter-load'); const moreLoad = await ripple(); assert.ok(moreLoad > initial * 1.5);
-    await page.click('#filter-reset'); const restored = await ripple(); assert.ok(Math.abs(restored / initial - 1) < .03);
-    await page.fill('#risposta', String(restored)); await page.click('#conferma'); assert.match(await page.locator('#esito').innerText(), /Giusto/);
+    assert.match(await page.locator('#filter-values').innerText(), /R1 [\d,]+ Ω/, 'il valore di R1 in ohm, non in colori');
+    await page.click('#filter-reset'); const restored = await ripple(); assert.ok(Math.abs(restored / initial - 1) < .05);
+    const pp = await traccia(page); await clicca(page, cresta(pp).x, cresta(pp).y); await clicca(page, valle(pp).x, valle(pp).y);
+    const c = await cursori(page); await page.fill('#risposta', String(c.dv.toFixed(3))); await page.click('#conferma'); assert.match(await page.locator('#esito').innerText(), /Giusto/, `ΔV ${c.dv}`);
     await page.screenshot({ path: `${scatti}/12-ponte-filtro.png`, fullPage: true });
+  });
+
+  await prova('l\'oscilloscopio compare solo dove serve: negli esercizi in continua non c\'è', async () => {
+    await page.click('#al-menu'); await page.click('.esercizio[data-id=partitore]'); await page.locator('.scena').waitFor();
+    assert.equal(await page.locator('#oscilloscopio').count(), 0);
+    await page.click('#al-menu'); await page.click('.esercizio[data-id=libero]'); await page.locator('#cassetto').waitFor(); assert.equal(await page.locator('#oscilloscopio').count(), 1, 'sul banco libero sì');
   });
 
   await prova('oscilloscopio a 390 px: sonde col tocco, tutti i comandi accessibili e nessuno scorrimento laterale', async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     const p = await context.newPage(); ascolta(p); await p.goto(base);
-    await p.tap('.esercizio[data-id=bridge-ripple]'); await p.tap('#scope-0-probe'); await piedino(p, 'C1.1').tap();
-    await p.tap('#scope-0-ground'); await piedino(p, 'C1.2').tap();
+    await p.tap('.esercizio[data-id=bridge-ripple]'); await p.tap('#scope-0-probe'); await piedino(p, 'C1.1').tap(); await piedino(p, 'C1.2').tap();
     await p.selectOption('#scope-0-coupling', 'ac'); await p.selectOption('#scope-0-volt', '0.2'); await passi(p, 24);
     assert.equal(await p.locator('#scope-screen polyline').count(), 1);
     assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= 391));

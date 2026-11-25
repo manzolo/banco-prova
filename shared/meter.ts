@@ -93,7 +93,7 @@ export function read(scene: Element[], m: MeterState, p: Probes, o: { capV?: Rec
   }
   if (!attaccato) return out(m.dial === 'cap' ? formatFarad(0) : { display: 'OL', unit: m.dial === 'diode' ? 'V' : 'MΩ' }, m.dial === 'cap' ? 0 : NaN, 'open');
   // tensione che c'era già fra i puntali, senza il multimetro: se c'è, ohm, continuità e capacità non valgono
-  const acceso = scene.some(e => e.kind === 'V' && e.ac && e.volt !== 0) || Math.abs(between(solve([...scene, { id: 'M.in', kind: 'R', a: p.red!, b: p.black!, ohm: METER.inputOhm }], { ground: p.black!, capV: o.capV, dt: o.dt }))) > METER.liveOhmsVolt;
+  const acceso = scene.some(e => e.kind === 'V' && e.ac && e.volt !== 0) || Math.abs(between(solve([...scene, { id: 'M.in', kind: 'R', a: p.red!, b: p.black!, ohm: METER.inputOhm }], { ground: p.black! }))) > METER.liveOhmsVolt;   // senza memoria dei condensatori: la carica lasciata dall'ohmetro stesso non è «circuito acceso»
   if (m.dial === 'ohm' || m.dial === 'cont') {
     const v = between(sol), i = sol.current('M.src'), r = p.red === p.black ? 0 : i > 1e-13 ? v / i : Infinity;
     if (m.dial === 'ohm') return out(r < 0 ? { display: comma(r, 1), unit: 'Ω' } : formatOhm(r), r, acceso ? 'live' : 'ok');

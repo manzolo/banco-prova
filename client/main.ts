@@ -1,20 +1,22 @@
 // Banco di prova: l'interfaccia. Tre viste (menu, banco, «come funziona»). Lo stato del banco e ogni regola stanno in
 // shared/: qui si raccolgono i gesti, si chiede la lettura al modello a ogni passo e si mostra.
-import { CHAPTERS, DRAWER, EXERCISES } from '../shared/exercises.ts';
+import { CHAPTER_EN, CHAPTERS, DRAWER, EXERCISES } from '../shared/exercises.ts';
 import { answer, apply, newBench, partCurrent, tick, type Action, type Bench } from '../shared/game.ts';
 import type { Dial, Jack, Note, Reading } from '../shared/meter.ts';
 import { SAVE_KEY, parseSave, recordSolved, serializeSave, starCount, type Save } from '../shared/save.ts';
 import { beep, buzz, chime, click, pop, setSound } from './audio.ts';
 import { COME_HTML, COME_HTML_EN } from './come.ts';
+import { APPUNTI_HTML, APPUNTI_HTML_EN } from './appunti.ts';
 import { scopePanel, type ScopeLead } from './scope.ts';
+import { firstCard, helpButton } from './aiutini.ts';
 import { sceneSvg } from './draw.ts';
 import { h, stelle } from './ui.ts';
 import { lang, num, switchLang, t } from './i18n.ts';
 
 declare const __VERSION__: string;
-type View = 'menu' | 'banco' | 'come';
+type View = 'menu' | 'banco' | 'come' | 'appunti';
 const app = document.querySelector<HTMLDivElement>('#app')!;
-const S = { scopeLead: null as ScopeLead | null, tick: 0, view: 'menu' as View, save: leggi(), bench: null as Bench | null, reading: null as Reading | null, drawer: DRAWER[0].id, probe: 'red' as 'red' | 'black', version: __VERSION__,   // scritta alla compilazione: la mostra anche GitHub Pages, che non ha il server
+const S = { pumFino: 0, scopeLead: null as ScopeLead | null, tick: 0, view: 'menu' as View, save: leggi(), bench: null as Bench | null, reading: null as Reading | null, drawer: DRAWER[0].id, probe: 'red' as 'red' | 'black', version: __VERSION__,   // scritta alla compilazione: la mostra anche GitHub Pages, che non ha il server
   esito: null as { correct: boolean; stars: number; feedback: string | null } | null };
 setSound(S.save.sound);
 
@@ -48,13 +50,14 @@ function mostraMenu(): void {
     h('header', { class: 'testata' }, h('img', { src: `${import.meta.env.BASE_URL}assets/ui/logo.svg`, alt: '', class: 'logo' }),
       h('div', {}, h('h1', {}, t('Banco di prova', 'Test Bench')), h('p', { class: 'sotto' }, t('Componenti veri, multimetro vero, errori veri: ma qui il fusibile lo cambi con un clic.', 'Real parts, a real meter, real mistakes: but here you replace the fuse with a click.')))),
     h('p', { class: 'conto' }, t(`${conto.got} stelle su ${conto.of}`, `${conto.got} stars out of ${conto.of}`)),
-    ...CHAPTERS.map(c => h('section', { class: 'capitolo' }, h('h2', {}, c),
+    ...CHAPTERS.map(c => h('section', { class: 'capitolo' }, h('h2', {}, lang === 'en' ? CHAPTER_EN[c] ?? c : c),
       h('div', { class: 'esercizi' }, ...EXERCISES.filter(e => e.chapter === c).map(e => { const n = S.save.stars[e.id] ?? 0, fatti = S.save.done[e.id] ?? 0;
         return h('button', { class: `esercizio${n ? ' fatto' : ''}${e === prossimo ? ' prossimo' : ''}`, 'data-id': e.id, onclick: () => comincia(e.id) },
-          h('b', {}, e.title), h('span', { class: 'stelle' }, e === prossimo && !n ? t('comincia da qui', 'start here') : stelle(n)), fatti > 1 ? h('small', {}, t(`${fatti} varianti risolte`, `${fatti} variants solved`)) : null); })))),
+          h('b', {}, lang === 'en' ? e.titleEn : e.title), h('span', { class: 'stelle' }, e === prossimo && !n ? t('comincia da qui', 'start here') : stelle(n)), fatti > 1 ? h('small', {}, t(`${fatti} varianti risolte`, `${fatti} variants solved`)) : null); })))),
     h('section', { class: 'capitolo' }, h('h2', {}, t('Senza domande', 'No questions')),
       h('div', { class: 'esercizi' }, h('button', { class: 'esercizio libero', 'data-id': 'libero', onclick: () => comincia(null) }, h('b', {}, t('Banco libero', 'Free bench')), h('span', { class: 'stelle' }, ''), h('small', {}, t('Scegli un componente dal cassetto e misuralo come vuoi.', 'Pick a part from the drawer and measure it any way you like.'))))),
     h('footer', { class: 'piede' },
+      h('button', { class: 'testo', id: 'vai-appunti', onclick: () => vai('appunti') }, t('📖 Appunti', '📖 Notes')),
       h('button', { class: 'testo', id: 'vai-come', onclick: () => vai('come') }, t('Come funziona', 'How it works')),
       h('button', { class: 'testo', id: 'lingua', onclick: () => switchLang(lang === 'en' ? 'it' : 'en') }, lang === 'en' ? '🇮🇹 Italiano' : '🇬🇧 English'),
       h('button', { class: 'testo', id: 'suono', onclick: () => { S.save = { ...S.save, sound: !S.save.sound }; setSound(S.save.sound); scrivi(); click(); mostra(); } }, S.save.sound ? t('🔊 Suono acceso', '🔊 Sound on') : t('🔇 Suono spento', '🔇 Sound off')),
@@ -63,7 +66,7 @@ function mostraMenu(): void {
 
 function comincia(id: string | null, variante?: number): void {
   const v = variante ?? (id ? (S.save.done[id] ?? 0) : 0);
-  S.bench = newBench(id, v, S.drawer); S.reading = null; S.esito = null; S.probe = 'red'; S.scopeLead = null;
+  S.bench = newBench(id, v, S.drawer, lang); S.reading = null; S.esito = null; S.probe = 'red'; S.scopeLead = null;
   click(); vai('banco');
 }
 
@@ -82,7 +85,8 @@ function fai(a: Action): void {
 function passo(): void {
   if (!S.bench) return;
   const t = tick(S.bench, 0.05);
-  if (t.reading.blew) { pop(); S.bench = t.bench; S.reading = t.reading; vista?.ridisegna(); return; }
+  if (t.reading.blew) { S.pumFino = S.tick + 240; pop();      // il botto resta scritto quattro secondi
+    S.bench = t.bench; S.reading = t.reading; vista?.ridisegna(); return; }
   S.bench = t.bench; S.reading = t.reading; beep(t.reading.beep);
   vista?.lettura();
 }
@@ -98,7 +102,9 @@ function mostraBanco(): void {
     click();
     if (S.scopeLead) {
       const { channel, lead } = S.scopeLead;
-      fai({ type: 'scopeProbe', channel, lead, node: b.scope.channels[channel][lead] === node ? null : node }); return;
+      fai({ type: 'scopeProbe', channel, lead, node: b.scope.channels[channel][lead] === node ? null : node });
+      // posata la sonda si passa alla sua massa; posata la massa si torna ai puntali del multimetro
+      S.scopeLead = lead === 'probe' ? { channel, lead: 'ground' } : null; vista?.ridisegna(); return;
     }
     if (b.probes[S.probe] === node) { fai({ type: 'probe', color: S.probe, node: null }); return; }      // ritoccare lo stesso piedino toglie il puntale
     const posato = S.probe; S.probe = posato === 'red' ? 'black' : 'red';
@@ -114,7 +120,7 @@ function mostraBanco(): void {
     h('button', { class: 'scegli nero', id: 'scegli-nero', onclick: () => { S.scopeLead = null; S.probe = 'black'; click(); vista?.ridisegna(); } }, t('nero', 'black')),
     h('button', { class: 'piccolo', id: 'togli-puntali', onclick: () => { click(); S.scopeLead = null; S.probe = 'red'; S.bench = apply(apply(S.bench!, { type: 'probe', color: 'red', node: null }), { type: 'probe', color: 'black', node: null }); passo(); vista?.ridisegna(); } }, t('togli i puntali', 'remove leads')));
   const fusibili = h('div', { class: 'fusibili', id: 'fusibili' });
-  const cassetto = ex ? null : h('div', { class: 'cassetto', id: 'cassetto' }, h('span', { class: 'et' }, t('Dal cassetto', 'From the drawer')), ...DRAWER.map(d => h('button', { class: 'pezzo', 'data-pezzo': d.id, onclick: () => { S.drawer = d.id; comincia(null); } }, d.name)));
+  const cassetto = ex ? null : h('div', { class: 'cassetto', id: 'cassetto' }, h('span', { class: 'et' }, t('Dal cassetto', 'From the drawer')), ...DRAWER.map(d => h('button', { class: 'pezzo', 'data-pezzo': d.id, onclick: () => { S.drawer = d.id; comincia(null); } }, lang === 'en' ? d.nameEn : d.name)));
 
   const scope = scopePanel(() => S.bench!, fai, lead => { S.scopeLead = lead; vista?.ridisegna(); });
 
@@ -139,7 +145,7 @@ function mostraBanco(): void {
     if (S.esito?.correct) kids.push(h('div', { class: 'esito bene', id: 'esito' }, h('b', {}, `${t('Giusto', 'Correct')} ${stelle(S.esito.stars)}`), h('p', {}, e.explain),
       b.fusesBlown ? h('small', {}, t('Un fusibile bruciato è costato una stella.', 'A blown fuse cost one star.')) : null),
       h('div', { class: 'azioni' }, h('button', { class: 'conferma', id: 'altra', onclick: () => comincia(e.id) }, t('Un\'altra variante', 'Another variant')),
-        (() => { const dopo = EXERCISES[EXERCISES.findIndex(x => x.id === e.id) + 1]; return dopo ? h('button', { class: 'piccolo', id: 'successivo', onclick: () => comincia(dopo.id) }, `${t('Prossimo', 'Next')}: ${dopo.title} →`) : null; })()));
+        (() => { const dopo = EXERCISES[EXERCISES.findIndex(x => x.id === e.id) + 1]; return dopo ? h('button', { class: 'piccolo', id: 'successivo', onclick: () => comincia(dopo.id) }, `${t('Prossimo', 'Next')}: ${lang === 'en' ? dopo.titleEn : dopo.title} →`) : null; })()));
     domanda.replaceChildren(...kids.filter((k): k is Node => k !== null));
   };
   const rispondi = (valore: number): void => {
@@ -150,12 +156,12 @@ function mostraBanco(): void {
 
   app.replaceChildren(h('main', { class: 'banco' },
     h('header', { class: 'barra' }, h('button', { class: 'testo', id: 'al-menu', onclick: () => { click(); vai('menu'); } }, '← Menu'),
-      h('div', { class: 'titolo' }, h('b', {}, ex ? ex.title : t('Banco libero', 'Free bench')), h('span', {}, ex ? ex.chapter : t('nessuna domanda', 'no question')))),
+      h('div', { class: 'titolo' }, h('b', {}, ex ? ex.title : t('Banco libero', 'Free bench')), h('span', {}, ex ? (lang === 'en' ? CHAPTER_EN[ex.chapter] ?? ex.chapter : ex.chapter) : t('nessuna domanda', 'no question')))),
     h('div', { class: 'griglia' },
-      h('section', { class: 'pannello piano' }, scena, cassetto, h('p', { class: 'guida' }, t('Tocca un piedino (i cerchietti) per posarci il puntale scelto; ritoccalo per toglierlo. I ponticelli si aprono e si chiudono con un clic.', 'Tap a pin (the small circles) to place the selected lead; tap it again to remove it. Jumpers open and close with a click.'))),
+      h('section', { class: 'pannello piano' }, helpButton(firstCard(ex?.id ?? null, ex?.chapter ?? null)), scena, cassetto, h('p', { class: 'guida' }, t('Tocca un piedino (i cerchietti) per posarci il puntale scelto; ritoccalo per toglierlo. I ponticelli si aprono e si chiudono con un clic.', 'Tap a pin (the small circles) to place the selected lead; tap it again to remove it. Jumpers open and close with a click.'))),
       h('section', { class: 'pannello multimetro', id: 'multimetro' },
         h('div', { class: 'lcd' }, spia, display, unita), nota, selettore, boccole, puntali, fusibili),
-      scope.panel, domanda)));
+      ...(ex === null || ex.chapter === 'Alternata e oscilloscopio' ? [scope.panel] : []), domanda)));
 
   vista = {
     ridisegna(): void {
@@ -176,8 +182,8 @@ function mostraBanco(): void {
       scope.update(S.scopeLead);
       display.textContent = b.meter.dial === 'off' ? '' : num(r.display); unita.textContent = b.meter.dial === 'off' ? '' : r.unit;
       display.dataset.spento = String(b.meter.dial === 'off'); spia.textContent = r.beep ? '·)))' : '';
-      const testo = b.meter.dial === 'off' ? t('Multimetro spento: gira il selettore.', 'Meter off: turn the dial.') : NOTE[r.note](b);
-      if (nota.textContent !== testo) { nota.textContent = testo; nota.dataset.tono = r.note === 'ok' || r.note === 'open' || r.note === 'reverse' ? 'calmo' : 'allarme'; }
+      const testo = b.meter.dial === 'off' ? t('Multimetro spento: gira il selettore.', 'Meter off: turn the dial.') : NOTE[S.tick < S.pumFino ? 'fuse' : r.note](b);
+      if (nota.textContent !== testo) { nota.textContent = testo; nota.dataset.tono = S.tick >= S.pumFino && (r.note === 'ok' || r.note === 'open' || r.note === 'reverse') ? 'calmo' : 'allarme'; }
       for (const el of scena.querySelectorAll<SVGElement>('[data-led]')) el.setAttribute('opacity', String(Math.min(0.85, partCurrent(r, el.getAttribute('data-led')!) / 0.012)));
     },
   };
@@ -189,11 +195,16 @@ function mostraCome(): void {
   app.replaceChildren(h('main', { class: 'pagina' }, h('header', { class: 'barra' }, h('button', { class: 'testo', id: 'al-menu', onclick: () => { click(); vai('menu'); } }, '← Menu')), corpo));
 }
 
+function mostraAppunti(): void {
+  const corpo = h('article', { class: 'come appunti' }); corpo.innerHTML = lang === 'en' ? APPUNTI_HTML_EN : APPUNTI_HTML;
+  app.replaceChildren(h('main', { class: 'pagina' }, h('header', { class: 'barra' }, h('button', { class: 'testo', id: 'al-menu', onclick: () => { click(); vai('menu'); } }, '← Menu')), corpo));
+}
+
 function mostra(): void {
   vista = null;
   if (S.view === 'banco' && !S.bench) S.view = 'menu';
   document.body.dataset.vista = S.view;
-  if (S.view === 'menu') mostraMenu(); else if (S.view === 'banco') mostraBanco(); else mostraCome();
+  if (S.view === 'menu') mostraMenu(); else if (S.view === 'banco') mostraBanco(); else if (S.view === 'appunti') mostraAppunti(); else mostraCome();
 }
 mostra();
 

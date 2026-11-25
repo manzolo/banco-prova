@@ -2,12 +2,14 @@
 // verità del componente. Per ognuno c'è qui il procedimento che farebbe una persona, scritto come misure.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CHAPTERS, DRAWER, EXERCISES, buildExercise, checkAnswer, feedbackFor, rng, type Exercise } from '../shared/exercises.ts';
+import { CHAPTER_EN, CHAPTERS, DRAWER, EXERCISES, buildExercise, checkAnswer, feedbackFor, rng, type Exercise } from '../shared/exercises.ts';
 import { NEW_METER, read, type Dial, type Jack, type Reading } from '../shared/meter.ts';
 import { decodeBands, decodeCapacitorCode } from '../shared/parts.ts';
 import { flipSwitch, loop, padPositions, row, sceneElements, scenePads, type Scene } from '../shared/scene.ts';
 import { battery, diode, resistor, toggle } from '../shared/parts.ts';
-import { captureScope, newScope } from '../shared/scope.ts';
+import { cursorReading, scopeFrame, type ScopeState, type ScreenPoint } from '../shared/scope.ts';
+import { apply, newBench, tick } from '../shared/game.ts';
+import { SCOPE } from '../shared/config.ts';
 import { vicino } from './aiuti.ts';
 
 const misura = (s: Scene, dial: Dial, red: string, black: string, jack: Jack = 'v', o: { capV?: Record<string, number>; dt?: number } = {}): Reading => read(sceneElements(s), { ...NEW_METER, dial, jack }, { red, black }, o);
@@ -15,16 +17,33 @@ const piedini = (e: Exercise, i: number): string[] => e.scene.parts[i].pads;
 const conduce = (s: Scene, a: string, b: string): boolean => misura(s, 'diode', a, b).display !== 'OL';
 
 /** Come si risolve ogni esercizio usando solo ciò che si vede (bande, sigle) e ciò che dice il multimetro. */
-// Anche l'oscilloscopio è uno strumento: si usano solo campioni e scale, senza leggere elementi o truth.
-function trace(e: Exercise, node: string, ground: string) {
-  const scope = newScope(); scope.channels[0] = { ...scope.channels[0], probe: node, ground };
-  return captureScope(sceneElements(e.scene), scope).frame;
+// L'oscilloscopio si usa come una persona: sul banco vero (gli stessi passi del gioco), sceglie la scala più piccola che
+// tiene la traccia sullo schermo, guarda la traccia disegnata e posa i due cursori. Niente statistiche automatiche.
+function schermo(e: Exercise, node: string, ground: string, o: { coupling?: 'dc' | 'ac'; timeDiv?: number; settle?: number } = {}): { scope: ScopeState; punti: ScreenPoint[] } {
+  let b = newBench(e.id, 0); b = { ...b, exercise: e, scene: e.scene };
+  b = apply(b, { type: 'scopeProbe', channel: 0, lead: 'probe', node }); b = apply(b, { type: 'scopeProbe', channel: 0, lead: 'ground', node: ground });
+  let scope: ScopeState = { ...b.scope, timeDiv: o.timeDiv ?? b.scope.timeDiv, channels: [{ ...b.scope.channels[0], coupling: o.coupling ?? 'dc' }, b.scope.channels[1]] };
+  b = apply(b, { type: 'scope', scope });
+  for (let t = 0; t < (o.settle ?? 0.3); t += 0.05) b = tick(b, 0.05).bench;
+  // la scala più piccola con cui tutta la traccia sta dentro lo schermo
+  for (const vd of SCOPE.volts) { const prova = { ...scope, channels: [{ ...scope.channels[0], voltDiv: vd }, scope.channels[1]] as ScopeState['channels'] };
+    if (scopeFrame(b.samples, prova).traces[0].every(p => p.y >= 0 && p.y <= SCOPE.rows)) { scope = prova; break; } }
+  return { scope, punti: scopeFrame(b.samples, scope).traces[0] };
+}
+/** I due cursori su cresta e valle (o sulla cresta e sulla riga dello zero) della traccia disegnata. */
+const alto = (pp: ScreenPoint[]): ScreenPoint => pp.reduce((a, p) => p.y < a.y ? p : a), basso = (pp: ScreenPoint[]): ScreenPoint => pp.reduce((a, p) => p.y > a.y ? p : a);
+/** Due creste successive: i due massimi locali più alti, separati da almeno un quarto di schermo. */
+function dueCreste(pp: ScreenPoint[]): [ScreenPoint, ScreenPoint] {
+  const top = Math.min(...pp.map(p => p.y)), creste = pp.filter((p, i) => i > 0 && i < pp.length - 1 && p.y <= pp[i - 1].y && p.y <= pp[i + 1].y && p.y < top + 0.05);
+  const a = creste[0], b = creste.find(p => p.x > a.x + 0.3)!; return [a, b];
 }
 const PROCEDIMENTI: Record<string, (e: Exercise) => number> = {
-  'ac-peak': e => trace(e, 'T1.1', 'T1.2').stats[0].max / Math.SQRT2,
-  'ac-frequency': e => 1 / trace(e, 'T1.1', 'T1.2').periods[0]!,
-  'half-wave': e => trace(e, 'R1.1', 'R1.2').stats[0].max,
-  'bridge-ripple': e => { const s = trace(e, 'C1.1', 'C1.2').stats[0]; return s.max - s.min; },
+  'ac-peak': e => { const s = schermo(e, 'T1.1', 'T1.2'); return cursorReading(s.scope, 0, alto(s.punti), { x: 0, y: SCOPE.rows / 2 }).dv; },
+  'ac-frequency': e => { const hz = e.scene.parts[0].elements[0]; void hz;            // la frequenza non si guarda: si prova con tre basi dei tempi
+    for (const td of [0.005, 0.002, 0.0005, 0.0002]) { const s = schermo(e, 'G1.1', 'G1.2', { timeDiv: td }); try { const [a, b] = dueCreste(s.punti); const c = cursorReading(s.scope, 0, a, b); if (b.x - a.x > 2) return c.hz!; } catch { /* poche creste: si cambia scala */ } }
+    return NaN; },
+  'half-wave': e => { const s = schermo(e, 'R1.1', 'R1.2'); return cursorReading(s.scope, 0, alto(s.punti), { x: 0, y: SCOPE.rows / 2 }).dv; },
+  'bridge-ripple': e => { const s = schermo(e, 'C1.1', 'C1.2', { coupling: 'ac', settle: 0.5 }); return cursorReading(s.scope, 0, alto(s.punti), basso(s.punti)).dv; },
   colori: e => { const ohm = decodeBands(e.scene.parts[0].view.bands as string[]).ohm; return ohm >= 1e6 ? ohm / 1e6 : ohm >= 1e3 ? ohm / 1e3 : ohm; },
   tolleranza: e => { const nominale = decodeBands(e.scene.parts[0].view.bands as string[]).ohm, [a, b] = piedini(e, 0); return Math.abs(misura(e.scene, 'ohm', a, b).value / nominale - 1) <= 0.05 ? 0 : 1; },
   interrotta: e => e.scene.parts.findIndex(p => misura(e.scene, 'ohm', p.pads[0], p.pads[1]).display === 'OL'),
@@ -115,8 +134,8 @@ test('l\'anello: il generatore, i pezzi in serie, quelli in parallelo e la chius
   assert.equal(par.parts.length, 3); assert.equal(scenePads(par).length, 6);
 });
 
-test('il cassetto del banco libero: quindici pezzi, tutti misurabili', () => {
-  assert.equal(DRAWER.length, 15); assert.equal(new Set(DRAWER.map(d => d.id)).size, 15);
+test('il cassetto del banco libero: sedici pezzi, tutti misurabili', () => {
+  assert.equal(DRAWER.length, 16); assert.equal(new Set(DRAWER.map(d => d.id)).size, 16);
   for (const d of DRAWER) { const s = row([d.make()]); assert.ok(scenePads(s).length >= 2, d.name); assert.ok(Number.isFinite(misura(s, 'vdc', s.parts[0].pads[0], s.parts[0].pads[1]).value), d.name); }
 });
 
@@ -138,4 +157,48 @@ test('chi scrive il valore misurato al posto del nominale viene corretto con una
     if (!checkAnswer(c.question, real)) assert.match(feedbackFor(c.question, real) ?? '', /capacimetro/, `condensatore, variante ${v}`);
   }
   assert.match(buildExercise('colori', 0).text, /nominale/, 'il testo dice che si vuole il nominale');
+});
+
+test('gli esercizi in inglese: stessa scena e stessa risposta, testi tradotti, numeri col punto', () => {
+  const ITALIANO = /(?<![\p{L}])(il|della|è|puntale|puntali|misura|resistenza|selettore|quale|sinistra)(?![\p{L}])/iu;
+  const testi = (e: Exercise): string[] => [e.title, e.text, e.hint, e.explain, ...(e.question.kind === 'choice' ? e.question.options : []), ...(e.question.kind === 'number' && e.question.near ? [e.question.near.message] : [])];
+  for (const d of EXERCISES) for (let v = 0; v < 5; v++) {
+    const it = d.build(v, 'it'), en = d.build(v, 'en'), dove = `${d.id}, variante ${v}`;
+    assert.deepEqual(en, buildExercise(d.id, v, 'en'), `${dove}: build e buildExercise danno lo stesso esercizio`);
+    assert.deepEqual(it, d.build(v), `${dove}: l'italiano è la lingua di default`);
+    assert.deepEqual(en.scene, it.scene, `${dove}: la scena non dipende dalla lingua`);
+    const qi = it.question, qe = en.question;
+    if (qi.kind === 'number' && qe.kind === 'number') {
+      assert.deepEqual([qe.unit, qe.expected, qe.tolerancePct, qe.near?.value, qe.near?.tolerancePct], [qi.unit, qi.expected, qi.tolerancePct, qi.near?.value, qi.near?.tolerancePct], `${dove}: stessa domanda numerica`);
+    } else if (qi.kind === 'choice' && qe.kind === 'choice') {
+      assert.equal(qe.correct, qi.correct, `${dove}: stessa risposta giusta`); assert.equal(qe.options.length, qi.options.length, `${dove}: stesse scelte`);
+    } else assert.fail(`${dove}: il tipo di domanda cambia con la lingua`);
+    const ti = testi(it), te = testi(en);
+    te.forEach((s, i) => {
+      if (!/^[A-Z]+$/.test(s)) assert.notEqual(s, ti[i], `${dove}: «${s}» non è tradotto`);      // NPN e PNP restano uguali
+      assert.doesNotMatch(s, ITALIANO, `${dove}: parola italiana in «${s}»`);
+      assert.doesNotMatch(s, /\d,\d/, `${dove}: virgola decimale in «${s}»`);
+    });
+  }
+  for (const c of CHAPTERS) assert.ok(CHAPTER_EN[c] && CHAPTER_EN[c] !== c, `capitolo ${c} senza nome inglese`);
+  for (const d of DRAWER) { assert.ok(d.nameEn && d.nameEn !== d.name, `cassetto ${d.id}`); assert.doesNotMatch(d.nameEn, /\d,\d/, d.nameEn); }
+  for (const d of EXERCISES) assert.ok(d.titleEn && d.titleEn !== d.title, `titolo inglese di ${d.id}`);
+});
+
+test('chi scrive l\'efficace al posto del picco, o la targa al posto del misurato, riceve la spiegazione', () => {
+  for (let v = 0; v < 8; v++) {
+    const e = buildExercise('ac-peak', v), q = e.question as { expected: number };
+    assert.match(feedbackFor(e.question, q.expected / Math.SQRT2) ?? '', /valore efficace/, `picco, variante ${v}`);
+    const t = buildExercise('trasformatore', v), targa = Number(t.scene.parts[0].truth.voltRms);
+    assert.match(feedbackFor(t.question, targa) ?? '', /targa/, `trasformatore, variante ${v}`);
+    assert.equal(checkAnswer(t.question, targa), false, 'la targa non è la risposta: a vuoto dà di più');
+  }
+});
+
+test('i cursori: la riga centrale è lo zero, in su positivo, e la scala è quella del canale 1', () => {
+  const s = newBench('ac-peak').scope; s.channels[0] = { ...s.channels[0], voltDiv: 5 }; s.timeDiv = 0.002;
+  const c = cursorReading(s, 0, { x: 1, y: 2 }, { x: 6, y: 4 });
+  vicino(c.va, 10, 1e-9, 'due divisioni sopra il centro, a 5 V/div: +10 V'); vicino(c.vb, 0, 1e-9, 'sulla riga centrale: 0 V');
+  vicino(c.dv, 10, 1e-9, 'ΔV'); vicino(c.dt, 0.01, 1e-12, 'cinque divisioni a 2 ms/div'); vicino(c.hz!, 100, 1e-9, '1/Δt');
+  vicino(cursorReading(s, 0, { x: 0, y: 6 }, { x: 0, y: 6 }).va, -10, 1e-9, 'sotto il centro: negativo'); assert.equal(cursorReading(s, 0, { x: 3, y: 1 }, { x: 3, y: 2 }).hz, null, 'Δt zero: niente frequenza');
 });

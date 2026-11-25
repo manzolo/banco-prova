@@ -1,5 +1,7 @@
 # 🔧 Banco di prova
 
+> **In English:** a browser game to practise with electronic components, a multimeter and an oscilloscope. Real parts, a real meter, real mistakes: leave the red lead in the mA jack and the fuse blows. 24 exercises with variants, a free bench, help tables and study notes. Italian by default, English with the menu button or `?lang=en`. MIT licence.
+
 Simulatore di componenti elettronici, multimetro e oscilloscopio, da giocare nel browser: **resistenze, condensatori, bobine, diodi,
 LED, zener, transistor, fusibili e pile** da misurare con un multimetro che si usa come quello vero (selettore,
 boccole, puntali) e che sbaglia come quello vero: il puntale nella boccola sbagliata fa saltare il fusibile, gli ohm
@@ -36,7 +38,15 @@ make test-all      # tutto insieme: va lanciato prima di ogni commit
 - `tests/`, `scripts/difetti*.ts` — le prove e i difetti iniettati.
 - `docs/CONSEGNA.md` — stato dei lavori; `docs/MODELLO.md` — formule e approssimazioni.
 
+## Giocarlo
+
+Su <https://manzolo.github.io/banco-prova/> (in inglese: <https://manzolo.github.io/banco-prova/?lang=en>).
+
 ## Pubblicare
 
-Come gli altri giochi: `make bump PARTE=minor` (verifica, commit, tag), poi `make deploy` con `deploy.local.mk`
-(fuori da git: `DEPLOY_HOST`, `DEPLOY_DIR`, `DEPLOY_URL`). Lo decide Andrea.
+`make bump PARTE=minor` (verifica, commit e tag), poi `git push github main --tags`: il flusso di GitHub Actions
+ricontrolla e pubblica su GitHub Pages. In alternativa, come gli altri giochi, `make deploy` su un server con Docker.
+
+## Licenza
+
+MIT, vedi `LICENSE`. Niente risorse di terzi: disegni in SVG fatti a mano, suoni sintetizzati.

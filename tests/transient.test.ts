@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { solve, sourceVoltage, type Element } from '../shared/circuit.ts';
 import { TRANSIENT, SCOPE } from '../shared/config.ts';
 import { NEW_TRANSIENT, simulate, timeStep, transientStep, waveformStats } from '../shared/transient.ts';
-import { captureScope, channelVoltage, newScope, risingEdges, scopeElements, scopeFrame } from '../shared/scope.ts';
+import { captureScope, wholePeriods, channelVoltage, newScope, risingEdges, scopeElements, scopeFrame } from '../shared/scope.ts';
 import { rectifier, sceneElements, updateFilter } from '../shared/scene.ts';
 import { NEW_METER, read } from '../shared/meter.ts';
 import { apply, newBench, tick } from '../shared/game.ts';
@@ -58,10 +58,13 @@ test('filtro RC in alternata: a 50 Hz attenua secondo 1/√(1+(ωRC)²)', () => 
 test('i due ingressi da 1 MΩ caricano il circuito e misurano tensioni differenziali', () => {
   const s = connected(), e = { ...source(10), ac: false, rs: 1e6 };
   const one = captureScope([e], s).frame.stats[0]; vicino(one.mean, 5, .0001, 'partitore 1 MΩ + 1 MΩ');
-  s.channels[1] = { ...s.channels[1], probe: 'gnd', ground: 'p' };
+  s.channels[1] = { ...s.channels[1], probe: 'p', ground: s.channels[0].ground };
   const two = captureScope([e], s).frame;
-  vicino(two.stats[0].mean, 10 / 3, .0001, 'due ingressi in parallelo'); vicino(two.stats[1].mean, -10 / 3, .0001, 'canale invertito');
-  assert.equal(scopeElements(s).length, 2); assert.equal(scopeElements(newScope()).length, 0);
+  vicino(two.stats[0].mean, 10 / 3, .0001, 'due ingressi in parallelo, stessa massa'); vicino(two.stats[1].mean, 10 / 3, .0001, 'il secondo canale vede lo stesso punto');
+  assert.equal(scopeElements(s).length, 2, 'stessa massa: nessun collegamento in più'); assert.equal(scopeElements(newScope()).length, 0);
+  s.channels[1] = { ...s.channels[1], probe: 'gnd', ground: 'p' };
+  const corto = captureScope([e], s).frame;
+  vicino(corto.stats[0].mean, 0, 1e-4, 'le masse sono in comune: massa 2 sul punto alto lo cortocircuita a massa 1'); assert.equal(scopeElements(s).length, 3, 'due ingressi più il collegamento fra le masse');
   assert.equal(channelVoltage({ time: 0, v: { a: 15, b: 10 } }, { ...s.channels[0], probe: 'a', ground: 'b' }), 5);
 });
 
@@ -107,7 +110,8 @@ test('V~ coincide con il picco diviso √2 e mantiene il carico da 10 MΩ', () =
 test('semionda: negativo bloccato, una cresta ogni 20 ms, efficace e media diversi', () => {
   const circuit = sceneElements(rectifier(false, 9, 0, 1000));
   const frame = captureScope(circuit, connected('R1.1', 'R1.2')).frame;
-  vicino(frame.stats[0].min, 0, .001, 'semionda negativa bloccata'); vicinoRel(frame.stats[0].max, 9 * Math.SQRT2 - .68, .015, 'picco meno la caduta tipica');
+  vicino(frame.stats[0].min, 0, .001, 'semionda negativa bloccata'); const T = rectifier(false, 9, 0, 1000).parts.find(p => p.id === 'T1')!, picco = 9 * 1.12 * Math.SQRT2;
+  vicinoRel(frame.stats[0].max, picco - .68 - (picco / 1000) * Number(T.truth.rs), .015, 'picco a vuoto, meno il diodo, meno la caduta sul secondario (resistenza per corrente)');
   vicino(frame.periods[0]!, .02, .0001, 'una cresta per periodo');
   const probes = { red: 'R1.1', black: 'R1.2' };
   vicino(read(circuit, { ...NEW_METER, dial: 'vdc' }, probes).value, frame.stats[0].mean, .001, 'V⎓ legge la media');
@@ -117,7 +121,7 @@ test('semionda: negativo bloccato, una cresta ogni 20 ms, efficace e media diver
 test('ponte filtrato: picco meno due diodi, ricarica a 100 Hz, ripple e scarica RC', () => {
   const circuit = sceneElements(rectifier(true, 12, 470e-6, 1000)), scope = connected('C1.1', 'C1.2');
   const capture = captureScope(circuit, scope), s = capture.frame.stats[0];
-  vicino(s.max, 15.3, .3, 'due giunzioni sotto corrente di ricarica'); vicino(capture.frame.periods[0]!, .01, .0002, '100 Hz');
+  assert.ok(s.max > 12 * Math.SQRT2 && s.max < 12 * 1.12 * Math.SQRT2 - 1.2, `fra il picco di targa e quello a vuoto meno due diodi: ${s.max}`); vicino(capture.frame.periods[0]!, .01, .0002, '100 Hz');
   // La formula a piccolo ripple trascura la durata finita della ricarica e dà un limite superiore utile.
   const estimate = s.mean / (1000 * 100 * 470e-6);
   assert.ok(s.ripple > estimate * .7 && s.ripple < estimate * 1.05, `ripple ${s.ripple}, stima ${estimate}`);
@@ -147,7 +151,10 @@ test('banco: gli strumenti condividono il circuito, i sottopassi e la memoria; i
   const t = tick(b, .05); vicino(t.bench.time, .05, 1e-12, 'tempo elettrico'); assert.ok(t.bench.samples.length >= 500);
   vicino(t.reading.value, scopeFrame(t.bench.samples.slice(-200), b.scope).stats[0].acRms, .001, 'gli stessi campioni');
   const blown = tick(apply(t.bench, { type: 'jack', jack: 'ma' }), .05).bench;
+  const botto = tick(apply(t.bench, { type: 'jack', jack: 'ma' }), .05);
+  assert.equal(botto.reading.blew, 'ma', 'anche in alternata il fusibile che salta si annuncia (suono e pulsante)'); assert.equal(botto.reading.note, 'fuse');
   assert.equal(blown.meter.fuseMaBlown, true); assert.equal(blown.fusesBlown, 1); assert.equal(tick(blown, .05).bench.fusesBlown, 1);
+  assert.equal(tick(blown, .05).reading.blew, null, 'salta una volta sola');
 });
 
 test('comandi del filtro: varianti esplorabili e ripristino, senza perdere la tensione di C', () => {
@@ -171,4 +178,16 @@ test('banco: multimetro e oscilloscopio caricano insieme una sorgente ad alta re
   const t = tick(b, .05);
   vicino(t.reading.value, 10 / 2.1, .0001, '1 MΩ di sorgente su 1 MΩ ∥ 10 MΩ');
   vicino(scopeFrame(t.bench.samples, b.scope).stats[0].mean, t.reading.value, 1e-10, 'i due strumenti vedono lo stesso circuito');
+});
+
+// ---- dalla revisione critica (2026-11-25)
+
+test('accoppiamento AC: media ed efficace su un numero intero di periodi, qualunque sia la finestra', () => {
+  for (const [hz, td] of [[50, 0.001], [100, 0.0005], [50, 0.002], [50, 0.0005]] as const) {
+    const g: Element = { id: 'G', kind: 'V', a: 'p', b: 'gnd', volt: 3, rs: 1, ac: true, hz };
+    const s = connected('p', 'gnd'); s.timeDiv = td; s.channels[0] = { ...s.channels[0], coupling: 'ac' };
+    const f = captureScope([g], s).frame;
+    vicino(f.stats[0].mean, 0, 0.02, `${hz} Hz a ${td * 1000} ms/div: media zero`); vicinoRel(f.stats[0].acRms, 3, 0.01, `${hz} Hz a ${td * 1000} ms/div: efficace giusto`);
+  }
+  assert.deepEqual(wholePeriods([0, 1], [1, 2]), [1, 2], 'troppo pochi campioni: tutti');
 });

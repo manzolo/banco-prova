@@ -48,10 +48,15 @@ export const E12 = [10, 12, 15, 18, 22, 27, 33, 39, 47, 56, 68, 82] as const;
 export const BAND_COLORS = ['nero', 'marrone', 'rosso', 'arancio', 'giallo', 'verde', 'blu', 'viola', 'grigio', 'bianco'] as const;
 export const TOLERANCE_COLORS: Record<number, string> = { 1: 'marrone', 2: 'rosso', 5: 'oro', 10: 'argento' };
 
+/** Regola: un trasformatore piccolo a vuoto dà il 12% in più della targa; la targa vale a 0,4 A, da qui la resistenza del secondario. */
+export const TRANSFORMER = { openFactor: 1.12, ratedAmp: 0.4 } as const;
+/** Il generatore di funzioni: uscita da 50 Ω, come quelli da banco. */
+export const GENERATOR = { outputOhm: 50 } as const;
+
 /** Campionamento didattico: almeno 128 passi per periodo, al massimo 0,1 ms; soli segnali a bassa tensione. */
 export const TRANSIENT = { defaultHz: 50, maxStep: 0.0001, samplesPerPeriod: 128, settleSeconds: 0.2, measurementSeconds: 0.02 } as const;
-/** Oscilloscopio ideale a due ingressi differenziali isolati: niente collegamento fra le masse dei canali. */
-export const SCOPE = { inputOhm: 1e6, columns: 10, rows: 8,
+/** Oscilloscopio da banco: due ingressi da 1 MΩ con le masse in comune (fra loro un ohmico decimo: lo schermo della sonda). */
+export const SCOPE = { inputOhm: 1e6, groundOhm: 0.1, columns: 10, rows: 8,
   volts: [0.1, 0.2, 0.5, 1, 2, 5, 10], milliseconds: [0.1, 0.2, 0.5, 1, 2, 5, 10],
   defaultVoltDiv: 5, defaultTimeDiv: 0.002 } as const;
 

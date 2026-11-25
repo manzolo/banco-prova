@@ -13,9 +13,9 @@
   gli errori veri hanno le conseguenze vere.
 - **Ogni regola ha tre cose**: il commento, una prova in `tests/` con un valore noto, e la sua riga in
   `docs/MODELLO.md`. Le regole critiche hanno anche un difetto in `scripts/difetti-elenco.ts`.
-- **Ogni esercizio deve risolversi col multimetro e solo con quello**: in `tests/esercizi.test.ts` c'è, per ognuno,
+- **Ogni esercizio deve risolversi con gli strumenti e solo con quelli** (multimetro, oscilloscopio coi cursori): in `tests/esercizi.test.ts` c'è, per ognuno,
   il procedimento scritto come misure, provato su venti varianti. Un esercizio nuovo entra col suo procedimento.
-- **Onestà del modello**: solo continua, valori tipici e non di uno strumento preciso; lo dice la pagina «come
+- **Onestà del modello**: continua e alternata nel tempo (niente transitori delle bobine), valori tipici e non di uno strumento preciso; lo dice la pagina «come
   funziona». Niente esercizi sulla tensione di rete.
 - Niente risorse scaricate, salvo dati di pubblico dominio o CC0 documentati in `ASSET_LICENSES.md`.
   Suoni sintetizzati in WebAudio. Mai chiedere chiavi API o account.

@@ -1,9 +1,9 @@
 // I componenti del banco: ognuno sa che cosa porta stampato addosso (bande, sigla, codice), quali piedini ha e come si
 // comporta elettricamente, guasti compresi. Il banco li mette in scena; il risolutore vede solo gli elementi.
-import { BAND_COLORS, TRANSIENT, BJT, DIODES, TOLERANCE_COLORS, WIRE_OHM, type DiodeModel } from './config.ts';
+import { BAND_COLORS, GENERATOR, TRANSFORMER, TRANSIENT, BJT, DIODES, TOLERANCE_COLORS, WIRE_OHM, type DiodeModel } from './config.ts';
 import type { Element } from './circuit.ts';
 
-export type PartType = 'resistor' | 'capacitor' | 'inductor' | 'diode' | 'zener' | 'led' | 'bjt' | 'fuse' | 'battery' | 'pot' | 'switch' | 'transformer' | 'bridge';
+export type PartType = 'resistor' | 'capacitor' | 'inductor' | 'diode' | 'zener' | 'led' | 'bjt' | 'fuse' | 'battery' | 'pot' | 'switch' | 'transformer' | 'generator' | 'bridge';
 export interface Part {
   id: string; type: PartType;
   mark: string;                 // quello che c'è scritto o disegnato sul componente
@@ -130,10 +130,19 @@ export function toggle(id: string, closed: boolean): Part {
   return { id, type: 'switch', mark: 'interruttore', pads: p, elements: [{ id: `${id}.r`, kind: 'R', a: p[0], b: p[1], ohm: closed ? 0.02 : OPEN_OHM }], view: { closed }, truth: { closed } };
 }
 
-/** Il secondario di un trasformatore da rete: una tensione alternata (valore efficace) con la resistenza del suo filo. */
-export function transformer(id: string, voltRms: number, hz: number = TRANSIENT.defaultHz, wave: 'sine' | 'square' = 'sine'): Part {
+/**
+ * Il secondario di un trasformatore da rete. Sulla targa c'è la tensione a pieno carico; a vuoto ne dà il 12% in più, e
+ * la differenza cade sulla resistenza del filo quando si tira la corrente di targa (regola, valori tipici dei piccoli).
+ */
+export function transformer(id: string, voltRms: number): Part {
+  const p = pads(id, 2), open = voltRms * TRANSFORMER.openFactor, rs = (open - voltRms) / TRANSFORMER.ratedAmp;
+  return { id, type: 'transformer', mark: `secondario ${voltRms} V~`, pads: p, elements: [{ id: `${id}.v`, kind: 'V', a: p[0], b: p[1], volt: open, rs, ac: true, hz: TRANSIENT.defaultHz, wave: 'sine' }], view: {}, truth: { voltRms, openRms: open, rs } };
+}
+
+/** Generatore di funzioni da banco: tensione efficace, frequenza e forma d'onda regolate, uscita da 50 Ω. */
+export function generator(id: string, voltRms: number, hz: number, wave: 'sine' | 'square' = 'sine'): Part {
   const p = pads(id, 2);
-  return { id, type: 'transformer', mark: `secondario ${voltRms} V~`, pads: p, elements: [{ id: `${id}.v`, kind: 'V', a: p[0], b: p[1], volt: voltRms, rs: 0.8, ac: true, hz, wave }], view: {}, truth: { voltRms } };
+  return { id, type: 'generator', mark: 'generatore di funzioni', pads: p, elements: [{ id: `${id}.v`, kind: 'V', a: p[0], b: p[1], volt: voltRms, rs: GENERATOR.outputOhm, ac: true, hz, wave }], view: { wave }, truth: { voltRms, hz, wave } };
 }
 
 /** Un filo fra due nodi. */

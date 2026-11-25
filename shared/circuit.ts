@@ -105,7 +105,7 @@ export function solve(elements: Element[], opts: SolveOptions = {}): Solution {
   const volt: Record<string, number> = { [ground]: 0 };
   for (const [node, i] of idx) volt[node] = v[i];
   const capV: Record<string, number> = {};
-  for (const e of elements) if (e.kind === 'C') capV[e.id] = dt !== undefined && dt > 0 ? volt[e.a] - volt[e.b] : volt[e.a] - volt[e.b];
+  for (const e of elements) if (e.kind === 'C') capV[e.id] = volt[e.a] - volt[e.b];
   const byId = new Map(elements.map(e => [e.id, e]));
   return {
     v: volt, capV, converged,

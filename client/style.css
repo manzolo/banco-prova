@@ -123,3 +123,33 @@ h1 { font: 700 40px/1 Georgia, serif; color: var(--amber); }
 .scope-measures p { margin-top: 5px; }
 .scope-filter { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
 .scope-filter p { flex-basis: 100%; }
+
+.scope-grid .tacca { stroke-width: 1; }
+.cursore line { stroke: #ff9ff3; stroke-width: 1.2; stroke-dasharray: 5 4; }
+.cursore text { fill: #ff9ff3; font: 700 13px ui-monospace, monospace; }
+.cursore.c1 line { stroke: #7ee0ff; } .cursore.c1 text { fill: #7ee0ff; }
+.scope-riga-cursori { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+.scope-cursori { font: 600 13.5px ui-monospace, "DejaVu Sans Mono", monospace; flex: 1 1 260px; }
+#scope-screen svg { cursor: crosshair; }
+
+/* aiutini in sovraimpressione */
+.piano { position: relative; }
+.aiutino-box { position: absolute; top: 22px; right: 22px; z-index: 8; }
+.aiuto-tasto { width: 38px; height: 38px; border-radius: 50%; font: 700 20px Georgia, serif; background: var(--gold); color: #2a1c0c; border: none; box-shadow: 0 2px 8px #0008; }
+.aiutino { position: absolute; top: 46px; right: 0; width: min(430px, calc(100vw - 40px)); max-height: 70vh; overflow-y: auto; background: #fbf8f1; color: #1c1b22; border-radius: 10px; padding: 12px 14px; box-shadow: 0 10px 34px #000b; }
+.aiutino .chiudi { position: absolute; top: 6px; right: 8px; background: none; border: none; color: #555; font-size: 22px; padding: 2px 8px; }
+.aiutino-schede { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 26px 8px 0; }
+.aiutino .scheda { font-size: 12.5px; padding: 4px 8px; background: #ece6da; border-color: #d8cfbd; color: #3b2f63; }
+.aiutino .scheda.scelto { background: #3b2f63; color: #fff; }
+.carta h4 { margin: 4px 0 6px; font: 700 15px Georgia, serif; color: #3b2f63; }
+.carta p { font-size: 13.5px; margin: 6px 0; } .carta .piccolo { color: #555; font-size: 12.5px; }
+.codici { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.codici th { text-align: left; border-bottom: 1.5px solid #8d84a8; padding: 3px 5px; }
+.codici td { border-bottom: 1px solid #e2dccd; padding: 3px 5px; } .codici td.n { font-family: ui-monospace, monospace; }
+.pallino { display: inline-block; width: 13px; height: 13px; border-radius: 3px; border: 1px solid #0006; vertical-align: -2px; margin-right: 2px; }
+.carta .esempio { background: #ece6da; padding: 6px 8px; border-radius: 6px; }
+
+.indice-appunti { font-size: 14px; color: var(--mute); margin: 8px 0 4px; line-height: 1.9; } .indice-appunti a { color: var(--blue); }
+.come .formula { font: 600 15px ui-monospace, monospace; background: #1b182c; border-left: 3px solid var(--amber); padding: 8px 12px; border-radius: 4px; margin: 8px 0; overflow-x: auto; }
+.come .es { background: #1a2a22; border-radius: 6px; padding: 8px 12px; }
+.aiutino .appunti-link { margin-top: 8px; }

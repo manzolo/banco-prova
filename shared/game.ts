@@ -1,6 +1,6 @@
 // Lo stato del banco e le sue azioni: funzioni pure. Il client chiama apply() per ogni gesto e tick() a ogni passo:
 // tick fa passare il tempo (i condensatori si caricano attraverso il multimetro) e restituisce la lettura.
-import { buildExercise, checkAnswer, DRAWER, feedbackFor, type Exercise } from './exercises.ts';
+import { buildExercise, checkAnswer, DRAWER, feedbackFor, type Exercise, type Lang } from './exercises.ts';
 import { NEW_METER, read, meterElements, type Dial, type Jack, type MeterState, type Probes, type Reading } from './meter.ts';
 import { updateFilter, flipSwitch, row, sceneElements, scenePads, type Scene } from './scene.ts';
 
@@ -25,8 +25,8 @@ export type Action =
   | { type: 'probe'; color: 'red' | 'black'; node: string | null }
   | { type: 'switch'; partId: string } | { type: 'replaceFuse'; jack: 'ma' | 'a' } | { type: 'hint' } | { type: 'discharge' };
 
-export function newBench(exerciseId: string | null, variant = 0, drawerId = DRAWER[0].id): Bench {
-  const exercise = exerciseId === null ? null : buildExercise(exerciseId, variant);
+export function newBench(exerciseId: string | null, variant = 0, drawerId = DRAWER[0].id, lang: Lang = 'it'): Bench {
+  const exercise = exerciseId === null ? null : buildExercise(exerciseId, variant, lang);
   const libero = DRAWER.find(d => d.id === drawerId) ?? DRAWER[0];
   return { exercise, variant, scope: newScope(), time: 0, samples: [], scene: exercise ? exercise.scene : row([libero.make()]), meter: { ...NEW_METER }, probes: { red: null, black: null }, capV: {}, fusesBlown: 0, usedHint: false, tries: 0, solved: false };
 }
@@ -36,7 +36,7 @@ export function apply(b: Bench, a: Action): Bench {
   switch (a.type) {
     case 'scope': return { ...b, scope: a.scope };
     case 'scopeProbe': {
-      if (a.node !== null && !scenePads(b.scene).some(p => p.node === a.node)) return b;
+      if (a.node !== null && !scenePads(b.scene).some(p => p.node === a.node)) return b;      // la sonda dell'oscilloscopio non si posa nel vuoto
       const scope = { ...b.scope, channels: b.scope.channels.map((c, i) => i === a.channel ? { ...c, [a.lead]: a.node } : c) as ScopeState['channels'] };
       return { ...b, scope, samples: [] };
     }
@@ -48,13 +48,13 @@ export function apply(b: Bench, a: Action): Bench {
       return { ...b, scene: updateFilter(b.scene, capacity, load), samples: [] };
     }
 
-    case 'dial': return { ...b, samples: [], meter: { ...b.meter, dial: a.dial } };
-    case 'jack': return { ...b, samples: [], meter: { ...b.meter, jack: a.jack } };
+    case 'dial': return { ...b, meter: { ...b.meter, dial: a.dial } };
+    case 'jack': return { ...b, meter: { ...b.meter, jack: a.jack } };
     case 'probe': {
       if (a.node !== null && !scenePads(b.scene).some(p => p.node === a.node)) return b;
       const altro = a.color === 'red' ? 'black' : 'red';
       // i due puntali possono stare sullo stesso piedino: è il modo di «azzerare» lo strumento
-      return { ...b, samples: [], probes: { ...b.probes, [a.color]: a.node, [altro]: b.probes[altro] } };
+      return { ...b, probes: { ...b.probes, [a.color]: a.node, [altro]: b.probes[altro] } };
     }
     case 'switch': return b.scene.parts.some(p => p.id === a.partId && p.type === 'switch') ? { ...b, samples: [], scene: flipSwitch(b.scene, a.partId) } : b;
     case 'replaceFuse': {
@@ -85,12 +85,12 @@ export function tick(b: Bench, dt: number): { bench: Bench; reading: Reading } {
       }
       samples.push({ time: state.time, v: state.v });
     }
-    const keep = Math.max(measurementWindow(scene), b.scope.timeDiv * SCOPE.columns * 3);
+    const keep = Math.max(2.2 * measurementWindow(scene), b.scope.timeDiv * SCOPE.columns * 3);   // più di due periodi: media e AC su periodi interi
     const history = [...b.samples, ...samples].filter(s => s.time > state.time - keep);
     const values = history.filter(s => s.time > state.time - measurementWindow(scene) + step / 2).map(s => b.probes.red && b.probes.black ? (s.v[b.probes.red] ?? 0) - (s.v[b.probes.black] ?? 0) : 0);
-    b = { ...b, meter, time: state.time, samples: history, fusesBlown: b.fusesBlown + blown.length };
+    b = { ...b, meter, time: state.time, samples: history };
     reading = read(scene, meter, b.probes, { time: state.time, dt: step, capV: state.capV, solution, values });
-    if (blown.length) reading = { ...reading, note: 'fuse' };
+    if (blown.length) reading = { ...reading, note: 'fuse', blew: blown[0] };      // come in continua: il client fa il botto e mostra il cambio
   } else reading = read(scene, b.meter, b.probes, { capV: b.capV, dt });
   const meter = reading.blew ? { ...b.meter, fuseMaBlown: b.meter.fuseMaBlown || reading.blew === 'ma', fuseABlown: b.meter.fuseABlown || reading.blew === 'a' } : b.meter;
   return { bench: { ...b, meter, capV: reading.solution.capV, fusesBlown: b.fusesBlown + (reading.blew ? 1 : 0) }, reading };

@@ -103,4 +103,18 @@ export const DIFETTI: Difetto[] = [
   { nome: "dimezzare il carico non cambia la resistenza", file: "game.ts", da: "a.setting === 'load' ? 2 : 1", a: "a.setting === 'load' ? 1 : 1" },
   { nome: "il fusibile ignora i picchi alternati", file: "game.ts", da: "if (Math.abs(solution.current('M.shunt')) >", a: "if (false && Math.abs(solution.current('M.shunt')) >" },
   { nome: "nel banco manca il carico delle sonde", file: "game.ts", da: "...sceneElements(b.scene), ...scopeElements(b.scope)", a: "...sceneElements(b.scene)" },
+  // ---- dalla revisione critica dell'oscilloscopio (2026-11-25)
+  { nome: 'in alternata il fusibile salta senza annunciarsi', file: 'game.ts', da: 'if (blown.length) reading = { ...reading, note: \'fuse\', blew: blown[0] };', a: 'if (blown.length) reading = { ...reading, note: \'fuse\' };' },
+  { nome: 'l\'accoppiamento AC usa la media di tutta la registrazione', file: 'scope.ts', da: 'return { ...full, mean: whole.mean, rms: whole.rms, acRms: whole.acRms };', a: 'return full;' },
+  { nome: 'i periodi interi partono dal primo campione', file: 'scope.ts', da: '  const a = edges[0], b = edges.at(-1)!;', a: '  const a = -1, b = edges.at(-1)!;' },
+  { nome: 'la registrazione è più corta di due periodi', file: 'scope.ts', da: 'Math.max(scope.timeDiv * SCOPE.columns * 3, 2.2 * measurementWindow(circuit))', a: 'scope.timeDiv * SCOPE.columns * 3' },
+  { nome: 'le masse dei due canali sono isolate', file: 'scope.ts', da: '  return g0 && g1 && g0 !== g1 ? [...ingressi, { id: \'O.masse\', kind: \'R\', a: g0, b: g1, ohm: SCOPE.groundOhm }] : ingressi;', a: '  return ingressi;' },
+  { nome: 'la carica lasciata dall\'ohmetro sembra un circuito acceso', file: 'meter.ts', da: 'ohm: METER.inputOhm }], { ground: p.black! }))) > METER.liveOhmsVolt;', a: 'ohm: METER.inputOhm }], { ground: p.black!, capV: o.capV, dt: o.dt }))) > METER.liveOhmsVolt;' },
+  { nome: 'a vuoto il trasformatore dà la tensione di targa', file: 'config.ts', da: 'openFactor: 1.12,', a: 'openFactor: 1,' },
+  { nome: 'il generatore di funzioni non ha resistenza d\'uscita', file: 'config.ts', da: 'outputOhm: 50 }', a: 'outputOhm: 0.001 }' },
+  { nome: 'l\'efficace al posto del picco non ha spiegazione', file: 'exercises.ts', da: 'near: { value: picco / Math.SQRT2, tolerancePct: 2,', a: 'near: { value: picco * 9, tolerancePct: 2,' },
+  { nome: 'la targa al posto del valore misurato non ha spiegazione', file: 'exercises.ts', da: 'near: { value: v, tolerancePct: 0.5, message: L.t(\'Questo è il valore di targa', a: 'near: { value: v * 9, tolerancePct: 0.5, message: L.t(\'Questo è il valore di targa' },
+  { nome: 'i cursori misurano dall\'alto dello schermo', file: 'scope.ts', da: 'volt = (p: ScreenPoint): number => (SCOPE.rows / 2 - p.y) * vd;', a: 'volt = (p: ScreenPoint): number => -p.y * vd;' },
+  { nome: 'i cursori ignorano la base dei tempi', file: 'scope.ts', da: 'const dt = Math.abs(b.x - a.x) * scope.timeDiv;', a: 'const dt = Math.abs(b.x - a.x) * 0.001;' },
+  { nome: 'la sonda dell\'oscilloscopio si posa su un piedino che non esiste', file: 'game.ts', da: '      if (a.node !== null && !scenePads(b.scene).some(p => p.node === a.node)) return b;      // la sonda dell\'oscilloscopio non si posa nel vuoto\n', a: '' },
 ];

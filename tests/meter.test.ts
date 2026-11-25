@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Element } from '../shared/circuit.ts';
 import { NEW_METER, formatAmp, formatFarad, formatOhm, formatVolt, meterElements, read, type Dial, type MeterState } from '../shared/meter.ts';
-import { battery, bjt, capacitor, diode, fuse, inductor, pot, resistor, transformer, wire, type Part } from '../shared/parts.ts';
+import { battery, bjt, capacitor, diode, fuse, generator, inductor, pot, resistor, transformer, wire, type Part } from '../shared/parts.ts';
 import { vicino } from './aiuti.ts';
 
 const m = (dial: Dial, o: Partial<MeterState> = {}): MeterState => ({ ...NEW_METER, dial, ...o });
@@ -113,7 +113,7 @@ test('voltmetro: la pila a vuoto, il verso dei puntali, e l\'alternata', () => {
   const b = battery('B', '9v', 1);
   vicino(su(b, 'vdc').value, 9.6, 1e-4, 'a vuoto'); assert.equal(su(b, 'vdc').display, '9,60'); vicino(su(b, 'vdc', 1, 0).value, -9.6, 1e-4, 'puntali scambiati: segno meno');
   assert.equal(su(b, 'vdc', 1, 0).display, '−9,60'); vicino(su(b, 'vac').value, 0, 1e-9, 'in alternata una pila legge zero');
-  const t = transformer('T', 12); vicino(su(t, 'vac').value, 12, 0.001, '12 V efficaci'); vicino(su(t, 'vdc').value, 0, 1e-9, 'in continua un\'alternata legge zero');
+  const t = transformer('T', 12); vicino(su(t, 'vac').value, 12 * 1.12, 0.002, 'targa 12 V: a vuoto 13,44 V efficaci'); vicino(su(t, 'vdc').value, 0, 1e-9, 'in continua un\'alternata legge zero');
 });
 
 test('pila sotto carico: quella scarica crolla, quella nuova no', () => {
@@ -175,4 +175,20 @@ test('in circuito una resistenza si legge in parallelo al resto', () => {
 test('potenziometro: fra un estremo e il cursore legge la sua parte, fra gli estremi il totale', () => {
   const p = pot('P', 10000, 0.3);
   vicino(su(p, 'ohm', 0, 1).value, 3000, 0.5, 'primo-cursore'); vicino(su(p, 'ohm', 1, 2).value, 7000, 1, 'cursore-terzo'); vicino(su(p, 'ohm', 0, 2).value, 10000, 1, 'estremi');
+});
+
+// ---- dalla revisione critica dell'oscilloscopio (2026-11-25)
+
+test('la carica che lascia l\'ohmetro in un condensatore non è «circuito acceso»', () => {
+  const c = capacitor('C', 1000e-6, 'electrolytic'), probes = { red: c.pads[0], black: c.pads[1] };
+  let capV: Record<string, number> = { 'C.c': 0 };
+  for (let i = 0; i < 100; i++) { const r = read(c.elements, m('ohm'), probes, { capV, dt: 0.02 }); capV = r.solution.capV; assert.equal(r.note, 'ok', `a ${(i * 0.02).toFixed(2)} s la lettura vale: ${r.note}`); }
+  assert.ok(capV['C.c'] > 0.3, 'e intanto il condensatore si è caricato');
+});
+
+test('il generatore di funzioni ha 50 Ω d\'uscita: su un carico da 50 Ω la tensione si dimezza', () => {
+  const g = generator('G', 2, 1000), carico = resistor('R', 50, 1);
+  const rete: Element[] = [...g.elements, ...carico.elements, wire('w1', 'G.1', 'R.1'), wire('w2', 'G.2', 'R.2')];
+  vicino(read(g.elements, m('vac'), { red: 'G.1', black: 'G.2' }).value, 2, 0.01, 'a vuoto 2 V efficaci');
+  vicino(read(rete, m('vac'), { red: 'R.1', black: 'R.2' }).value, 1, 0.01, 'sui 50 Ω ne restano metà');
 });

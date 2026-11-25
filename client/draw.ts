@@ -53,6 +53,10 @@ function body(p: Part, showMarks: boolean, scope?: ScopeState): string {
         `<path d="M-24,0 L0,-24 L24,0 L0,24 Z" fill="none" stroke="#cfd3da"/><text y="4" class="sigla piccola">${t('4 diodi', '4 diodes')}</text>`;
     case 'transformer':
       return `${fili()}<rect x="-30" y="-22" width="60" height="44" rx="4" fill="#4a3b2a" stroke="#221a10"/><rect x="-22" y="-14" width="44" height="28" fill="#b9793a"/><text y="6" class="sigla scura">${esc(String(p.truth.voltRms))} V~</text>`;
+    case 'generator': {
+      const quadra = p.view.wave === 'square', onda = quadra ? 'M-14,4 L-14,-6 L-4,-6 L-4,4 L6,4 L6,-6 L14,-6' : 'M-14,0 C-9,-12 -5,-12 0,0 S9,12 14,0';
+      return `${fili()}<rect x="-32" y="-22" width="64" height="44" rx="4" fill="#2a3346" stroke="#11151f"/><rect x="-24" y="-15" width="48" height="22" rx="2" fill="#0d2a1c"/><path d="${onda}" transform="translate(0,-4)" fill="none" stroke="#9be0aa" stroke-width="2"/><text y="17" class="sigla piccola">GEN</text>`;
+    }
     default:
       return `${fili(p.pads.length)}<rect x="-30" y="-12" width="60" height="24" rx="4" fill="#555"/>`;
   }
