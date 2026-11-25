@@ -1,0 +1,52 @@
+# Pubblica il gioco su GitHub Pages quando arriva un tag v<versione> (lo crea `make bump`).
+# Prima verifica: il tag deve coincidere con package.json; compilazione, prove del modello, difetti iniettati e
+# controllo dei file pubblicabili devono passare. Le prove nel browser si fanno in locale prima del tag.
+name: Pubblica su Pages
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - name: Il tag coincide con la versione del gioco
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSIONE=$(node -p "require('./package.json').version")
+          echo "tag ${GITHUB_REF_NAME}, gioco v${VERSIONE}"
+          test "${GITHUB_REF_NAME}" = "v${VERSIONE}"
+      - run: npm ci
+      - name: Verifiche
+        run: |
+          npm run build
+          node --test tests/*.test.ts
+          node scripts/difetti.ts
+          bash scripts/check-public.sh
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

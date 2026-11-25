@@ -45,3 +45,51 @@ export const COME_HTML = `
 </ul>
 <p class="piccolo">Suoni sintetizzati. Niente dati lasciano il tuo browser: il salvataggio sta qui.</p>
 `;
+
+/** La stessa pagina in inglese. */
+export const COME_HTML_EN = `
+<h2>How it works</h2>
+<p>There is no answer table here: there is a small <b>circuit solver</b>. The multimeter and the oscilloscope do not "know" a component's value: they join the circuit as extra parts and show what comes out. That is why real mistakes have real consequences.</p>
+
+<h3>What the multimeter puts into the circuit</h3>
+<ul>
+<li><b>Voltmeter (V⎓, V~)</b>: a 10 MΩ resistance between the leads. On a high-resistance point it reads low, because it loads it.</li>
+<li><b>Ohmmeter and continuity (Ω, ·)))</b>: a weak source, 0.6 V through 1 kΩ. It reads the ratio of voltage to current. The beeper sounds below 50 Ω. 0.6 V does not turn a diode on: diodes have their own position.</li>
+<li><b>Diode test (▶|)</b>: 3 V through 2.2 kΩ, about 1 mA. It shows the voltage drop; above 2.5 V it shows OL.</li>
+<li><b>Capacitance (⊣⊢)</b>: adds up the capacitors between the leads, if there is no DC path discharging them.</li>
+<li><b>Ammeter (mA, 10 A)</b>: a shunt, almost a wire: 1.2 Ω in the mA jack (400 mA fuse), 0.02 Ω in the 10 A jack (10 A fuse). It is in the circuit <b>as soon as the red lead sits in that jack</b>, whatever the dial says. With AC the fuse limit is checked at every step: it trips instantly on the peak, with no thermal model.</li>
+</ul>
+
+<h3>AC and the oscilloscope</h3>
+<p>The AC source produces a sine wave: v(t) = √2 · Vrms · sin(2πft), normally at 50 Hz. The peak is √2 times the RMS value. The circuit is solved in time with steps of at most 0.1 ms, at least 128 per period. Capacitors remember their charge: here the bridge rectifier and the filter really work through the computed currents.</p>
+<p><b>Two 1 MΩ channels</b>, each between its probe and its ground. They are isolated differential inputs: the two grounds are not connected to each other, unlike the common grounds of many bench scopes. A multimeter connected at the same time also loads the circuit.</p>
+<p>The graticule has <b>10 × 8 divisions</b>. V/div and ms/div set the scales; DC shows the whole signal, AC centres the trace by removing the average of the record. It is an ideal coupling, without the capacitor and bandwidth of a real instrument. The trigger locks onto the rising edge at the chosen level; if it finds none the screen says "free running". The numeric readouts use the whole signal before coupling: minimum, maximum, peak-to-peak, AC RMS and period.</p>
+<p><b>V⎓ reads the average; V~ the RMS of the AC component</b>, computed from the samples with its 10 MΩ input. On a sine wave it equals Vpeak/√2. On the filter it reads the RMS of the ripple, not the total voltage.</p>
+<p>The bridge has four diodes, two conducting in each half cycle: the filter is recharged at 100 Hz from a 50 Hz input. Between the peaks the capacitor feeds the load. <b>Ripple</b> is maximum minus minimum; for small ripple ΔV ≈ I/(2fC). Double capacitance reduces ripple; half the resistance draws more current and increases it. After each change wait for the new steady state.</p>
+
+<h3>Mistakes you can make here without damage</h3>
+<ul>
+<li>Leaving the red lead in the mA jack and measuring a voltage: short circuit across the source, blown fuse.</li>
+<li>Measuring ohms on a live circuit: the reading is not valid. An AC source in the scene makes the circuit count as live even when it crosses zero.</li>
+<li>Judging a battery with no load: a flat one looks fine until you ask it for current.</li>
+<li>Measuring an AC voltage with the dial on DC: zero, even though the voltage is there.</li>
+</ul>
+
+<h3>How the parts are made</h3>
+<ul>
+<li><b>Resistors</b>: the true value lies within the tolerance, never exactly the nominal. Faults: open, or drifted up.</li>
+<li><b>Diodes, LEDs, zeners</b>: the real current-voltage curve (Shockley equation), with parameters chosen to give typical drops at 1 mA: silicon 0.6 V, Schottky 0.2 V, red LED 1.8 V, green 2.1 V, blue 2.9 V.</li>
+<li><b>Capacitors</b>: open in DC; through the ohmmeter they charge with their own time constant (resistance times capacitance), which is why the reading climbs by itself.</li>
+<li><b>Inductors</b>: in DC they are their wire, a few ohms. Inductance cannot be measured with a multimeter.</li>
+<li><b>Transistors</b>: seen by the multimeter they are two junctions starting from the base. The simulator does not make them amplify.</li>
+<li><b>Batteries</b>: as they run down the open-circuit voltage drops a little, the internal resistance grows a lot.</li>
+</ul>
+
+<h3>What is not here</h3>
+<ul>
+<li>DC and AC in time with resistors, diodes and capacitors. Inductors remain just the resistance of their wire: no inductive transients. No capacitor ESR, no diode reverse recovery, no noise, nothing much faster than the calculation step.</li>
+<li>The multimeter figures (10 MΩ, 0.6 V, 50 Ω, the fuses) are typical of a cheap instrument, not of a specific model. Yours may beep at 30 Ω or test diodes at 2 V.</li>
+<li>No dangerous voltages: here you work with batteries and low-voltage isolated secondaries. <b>Do not improvise these tests on 230 V mains.</b></li>
+</ul>
+<p class="piccolo">Synthesised sounds. No data leaves your browser: progress is saved here.</p>
+`;

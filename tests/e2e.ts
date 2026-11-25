@@ -218,6 +218,22 @@ try {
     await p.screenshot({ path: `${scatti}/13-telefono-oscilloscopio.png`, fullPage: true }); await context.close();
   });
 
+  await prova('in inglese: si sceglie dal menu, resta scelta, e tornando all\'italiano torna tutto come prima', async () => {
+    await page.goto(base); await page.locator('#lingua').waitFor();
+    assert.match(await page.locator('#lingua').innerText(), /English/); assert.equal(await page.evaluate(() => document.documentElement.lang), 'it');
+    await page.click('#lingua'); await page.locator('h1').waitFor();
+    assert.equal(await page.locator('h1').innerText(), 'Test Bench'); assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+    assert.match(await page.locator('#vai-come').innerText(), /How it works/);
+    await page.goto(base); await page.locator('h1').waitFor(); assert.equal(await page.locator('h1').innerText(), 'Test Bench', 'ricaricando resta in inglese');
+    await page.click('.esercizio[data-id=libero]'); await page.locator('#cassetto').waitFor();
+    await page.click('.pos[data-dial=ohm]'); await posa(page, 'X1.1', 'X1.2');
+    assert.match(await page.locator('#lcd').innerText(), /^\d+\.\d+$/, 'in inglese il display usa il punto decimale');
+    assert.match(await page.locator('.multimetro').innerText(), /Red lead in jack/);
+    await page.screenshot({ path: `${scatti}/14-inglese.png`, fullPage: true });
+    await page.click('#al-menu'); await page.click('#vai-come'); assert.match(await page.locator('.come').innerText(), /circuit solver/);
+    await page.goto(`${base}/?lang=it`); await page.locator('h1').waitFor(); assert.equal(await page.locator('h1').innerText(), 'Banco di prova', 'con ?lang=it torna l\'italiano');
+  });
+
   await prova('il server dice chi è e che versione serve', async () => {
     const r = await (await fetch(`${base}/api/health`)).json() as { ok: boolean; gioco: string; versione: string };
     assert.equal(r.gioco, 'Banco di prova'); assert.match(r.versione, /^\d+\.\d+\.\d+$/);

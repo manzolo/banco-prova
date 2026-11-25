@@ -2,7 +2,7 @@
   "name": "banco-prova",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Banco di prova — simulatore di componenti elettronici e multimetro: misura, sbaglia senza danni, impara",
   "engines": {

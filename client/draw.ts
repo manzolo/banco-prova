@@ -5,6 +5,7 @@ import type { Part } from '../shared/parts.ts';
 import type { Probes } from '../shared/meter.ts';
 import type { ScopeState } from '../shared/scope.ts';
 import { esc } from './ui.ts';
+import { num, t } from './i18n.ts';
 
 const BAND: Record<string, string> = { nero: '#141414', marrone: '#7a4a21', rosso: '#d42a2a', arancio: '#f08a1c', giallo: '#f2d21a', verde: '#2e9e4a', blu: '#2b56c8', viola: '#8a3fc4', grigio: '#8a8a8a', bianco: '#f2f2f2', oro: '#c9a23a', argento: '#c4c8cc' };
 const LED: Record<string, string> = { red: '#ff3b30', green: '#34d058', blue: '#3b82ff' };
@@ -20,7 +21,7 @@ function body(p: Part, showMarks: boolean, scope?: ScopeState): string {
     case 'capacitor':
       return p.view.kind === 'ceramic'
         ? `${fili()}<ellipse cx="0" cy="0" rx="19" ry="17" fill="#d98c2b" stroke="#9a5f17"/><text y="5" class="sigla scura">${esc(p.mark)}</text>`
-        : `${fili()}<rect x="-28" y="-17" width="56" height="34" rx="5" fill="#1d2b4f" stroke="#0e1730"/><rect x="14" y="-17" width="10" height="34" fill="#c9d2e6"/><text x="19" y="5" class="sigla scura">−</text><text x="-8" y="4" class="sigla piccola">${esc(p.mark.replace(' 25 V', ''))}</text>`;
+        : `${fili()}<rect x="-28" y="-17" width="56" height="34" rx="5" fill="#1d2b4f" stroke="#0e1730"/><rect x="14" y="-17" width="10" height="34" fill="#c9d2e6"/><text x="19" y="5" class="sigla scura">−</text><text x="-8" y="4" class="sigla piccola">${esc(num(p.mark.replace(' 25 V', '')))}</text>`;
     case 'inductor':
       return `${fili()}<rect x="-26" y="-10" width="52" height="20" rx="4" fill="#3a3f4a"/>` + [-20, -12, -4, 4, 12, 20].map(x => `<path d="M${x - 4},10 A4,12 0 0 1 ${x + 4},10" fill="none" stroke="#c9792e" stroke-width="3"/><path d="M${x - 4},-10 A4,12 0 0 0 ${x + 4},-10" fill="none" stroke="#c9792e" stroke-width="3"/>`).join('');
     case 'diode': case 'zener': {
@@ -39,17 +40,17 @@ function body(p: Part, showMarks: boolean, scope?: ScopeState): string {
       return `${fili()}<rect x="-24" y="-8" width="48" height="16" rx="3" fill="#efe9dc" stroke="#b7ad96"/><rect x="-28" y="-9" width="10" height="18" rx="2" fill="#b9bec6"/><rect x="18" y="-9" width="10" height="18" rx="2" fill="#b9bec6"/>`;
     case 'battery': {
       const nove = p.view.kind === '9v';
-      return `${fili()}<rect x="-32" y="${nove ? -20 : -12}" width="64" height="${nove ? 40 : 24}" rx="4" fill="${nove ? '#2a2a30' : '#b3202a'}" stroke="#000"/><rect x="-32" y="${nove ? -20 : -12}" width="16" height="${nove ? 40 : 24}" rx="4" fill="#c9a23a"/><text x="-24" y="5" class="sigla scura">+</text><text x="22" y="5" class="sigla">−</text><text x="2" y="4" class="sigla piccola">${nove ? '9 V' : '1,5 V'}</text>`;
+      return `${fili()}<rect x="-32" y="${nove ? -20 : -12}" width="64" height="${nove ? 40 : 24}" rx="4" fill="${nove ? '#2a2a30' : '#b3202a'}" stroke="#000"/><rect x="-32" y="${nove ? -20 : -12}" width="16" height="${nove ? 40 : 24}" rx="4" fill="#c9a23a"/><text x="-24" y="5" class="sigla scura">+</text><text x="22" y="5" class="sigla">−</text><text x="2" y="4" class="sigla piccola">${nove ? '9 V' : num('1,5 V')}</text>`;
     }
     case 'switch': {
       const chiuso = p.view.closed as boolean;
       return `<line x1="-50" y1="0" x2="-22" y2="0" class="reoforo"/><line x1="22" y1="0" x2="50" y2="0" class="reoforo"/><circle cx="-22" cy="0" r="5" fill="#c9a23a"/><circle cx="22" cy="0" r="5" fill="#c9a23a"/>` +
-        `<line x1="-22" y1="0" x2="${chiuso ? 22 : 16}" y2="${chiuso ? 0 : -24}" stroke="#e8e2f2" stroke-width="5" stroke-linecap="round"/><rect class="tocca" data-switch="${p.id}" x="-34" y="-34" width="68" height="50" fill="transparent"><title>ponticello: clic per aprire o chiudere</title></rect>`;
+        `<line x1="-22" y1="0" x2="${chiuso ? 22 : 16}" y2="${chiuso ? 0 : -24}" stroke="#e8e2f2" stroke-width="5" stroke-linecap="round"/><rect class="tocca" data-switch="${p.id}" x="-34" y="-34" width="68" height="50" fill="transparent"><title>${t('ponticello: clic per aprire o chiudere', 'jumper: click to open or close')}</title></rect>`;
     }
     case 'bridge':
       return '<rect x="-40" y="-50" width="80" height="100" rx="8" fill="#252833" stroke="#bbc3cf"/>' +
         '<text x="-26" y="-34" class="sigla">~</text><text x="26" y="-34" class="sigla">+</text><text x="-26" y="44" class="sigla">~</text><text x="26" y="44" class="sigla">−</text>' +
-        '<path d="M-24,0 L0,-24 L24,0 L0,24 Z" fill="none" stroke="#cfd3da"/><text y="4" class="sigla piccola">4 diodi</text>';
+        `<path d="M-24,0 L0,-24 L24,0 L0,24 Z" fill="none" stroke="#cfd3da"/><text y="4" class="sigla piccola">${t('4 diodi', '4 diodes')}</text>`;
     case 'transformer':
       return `${fili()}<rect x="-30" y="-22" width="60" height="44" rx="4" fill="#4a3b2a" stroke="#221a10"/><rect x="-22" y="-14" width="44" height="28" fill="#b9793a"/><text y="6" class="sigla scura">${esc(String(p.truth.voltRms))} V~</text>`;
     default:
@@ -69,7 +70,7 @@ export function sceneSvg(s: Scene, probes: Probes, showMarks: boolean, scope?: S
   }).join('');
   const piedini = scenePads(s).map(p => {
     const part = s.parts.find(x => x.id === p.partId)!, y = part.type === 'bjt' ? p.y - 22 + (p.index === 1 ? 22 : 0) : p.y;
-    return `<g class="piedino" data-node="${esc(p.node)}" transform="translate(${p.x},${y})"><circle r="16" fill="transparent"/><circle r="6.5" class="punto"/><title>${esc(part.id)}, piedino ${p.index + 1}</title></g>`;
+    return `<g class="piedino" data-node="${esc(p.node)}" transform="translate(${p.x},${y})"><circle r="16" fill="transparent"/><circle r="6.5" class="punto"/><title>${esc(part.id)}, ${t('piedino', 'pin')} ${p.index + 1}</title></g>`;
   }).join('');
   const dove = (node: string | null): { x: number; y: number } | null => {
     if (!node) return null;
@@ -81,5 +82,5 @@ export function sceneSvg(s: Scene, probes: Probes, showMarks: boolean, scope?: S
     const d = dove(node); if (!d) return '';
     return `<g class="puntale ${classe}" transform="translate(${d.x},${d.y})"><line x1="0" y1="0" x2="${dx}" y2="46" stroke="#cfd3da" stroke-width="3"/><line x1="${dx}" y1="46" x2="${dx * 2.1}" y2="96" stroke="${colore}" stroke-width="11" stroke-linecap="round"/><circle r="9" fill="none" stroke="${colore}" stroke-width="3.5"/></g>`;
   };
-  return `<svg viewBox="0 0 ${s.width} ${s.height}" class="scena" role="img" aria-label="il banco">${fili}${pezzi}${piedini}${puntale(probes.black, '#22242b', 'nero', -14)}${puntale(probes.red, '#e0353b', 'rosso', 14)}${scope?.channels.map((c, i) => puntale(c.probe, i ? '#69cfff' : '#ffd95a', `scope-${i}-probe`, 24 + i * 8) + puntale(c.ground, i ? '#338bb4' : '#a79342', `scope-${i}-ground`, -24 - i * 8)).join('') ?? ''}</svg>`;
+  return `<svg viewBox="0 0 ${s.width} ${s.height}" class="scena" role="img" aria-label="${t('il banco', 'the bench')}">${fili}${pezzi}${piedini}${puntale(probes.black, '#22242b', 'nero', -14)}${puntale(probes.red, '#e0353b', 'rosso', 14)}${scope?.channels.map((c, i) => puntale(c.probe, i ? '#69cfff' : '#ffd95a', `scope-${i}-probe`, 24 + i * 8) + puntale(c.ground, i ? '#338bb4' : '#a79342', `scope-${i}-ground`, -24 - i * 8)).join('') ?? ''}</svg>`;
 }
