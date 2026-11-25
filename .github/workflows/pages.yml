@@ -1,6 +1,6 @@
 # Pubblica il gioco su GitHub Pages quando arriva un tag v<versione> (lo crea `make bump`).
-# Prima verifica: il tag deve coincidere con package.json; compilazione, prove del modello, difetti iniettati e
-# controllo dei file pubblicabili devono passare. Le prove nel browser si fanno in locale prima del tag.
+# Prima verifica: il tag deve coincidere con package.json; compilazione, prove del modello e controllo dei file
+# pubblicabili devono passare. Difetti iniettati e prove nel browser (lenti) si fanno in locale, con make bump.
 name: Pubblica su Pages
 
 on:
@@ -42,10 +42,9 @@ jobs:
         run: |
           npm run build
           node --test tests/*.test.ts
-          node scripts/difetti.ts
           bash scripts/check-public.sh
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
       - id: deploy
