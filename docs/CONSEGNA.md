@@ -64,9 +64,10 @@ istantanea (dichiarato nella pagina «come funziona»).
 
 ## Pubblicare
 
-Su GitHub Pages: `make bump PARTE=minor` (verifica, commit, tag), poi `git push github main --tags`. Il flusso
-`.github/workflows/pages.yml` ricontrolla (compilazione, prove, difetti, file pubblicabili) e pubblica la cartella
-`dist`. Le prove nel browser si fanno in locale prima del tag.
+Su GitHub Pages: `make bump PARTE=minor` (verifica tutto in locale, compresi difetti e browser; commit e tag), poi
+`git push github main --tags`. Il flusso `.github/workflows/pages.yml` ricontrolla compilazione, prove e file
+pubblicabili (un minuto) e pubblica la cartella `dist`. Trappole già pagate: l'ambiente `github-pages` va aperto ai
+tag `v*` (di default accetta solo `main`); con `upload-pages-artifact@v3` il deploy non trova l'artefatto, serve la v4.
 
 ## Da decidere con Andrea
 
