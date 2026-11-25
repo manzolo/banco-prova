@@ -1,0 +1,15 @@
+# Il compose del VPS (make deploy lo copia in DEPLOY_DIR con il tag della versione al posto di VERSIONE).
+# Niente porte esposte: il container sta sulla rete esterna nginx-net, dove Nginx Proxy Manager lo pubblica
+# col suo nome (→ banco-prova:8803). Per tornare indietro: sul VPS si rimette il tag precedente e
+# `docker compose pull && docker compose up -d`.
+services:
+  banco-prova:
+    image: git.manzolo.it/manzolo/banco-prova:VERSIONE
+    container_name: banco-prova
+    restart: unless-stopped
+    networks:
+      - nginx-net
+
+networks:
+  nginx-net:
+    external: true

@@ -1,0 +1,11 @@
+services:
+  banco-prova:
+    build: .
+    image: banco-prova:latest
+    container_name: banco-prova
+    ports:
+      - "${DOCKER_PORT:-8803}:8803"
+    environment:
+      NODE_ENV: production
+      PORT: 8803
+    restart: unless-stopped

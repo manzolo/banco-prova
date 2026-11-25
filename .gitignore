@@ -1,0 +1,8 @@
+assets/raw/
+deploy.local.mk
+dist/
+.env
+*.log
+node_modules/
+prompts/
+test-results/
